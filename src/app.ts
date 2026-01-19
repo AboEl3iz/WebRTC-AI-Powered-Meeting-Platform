@@ -2,6 +2,7 @@ import  express , { Application } from "express";
 import {WebSocketServer} from "./interfaces/websocket/socketServer"
 import { Server as HTTPServer } from 'http';
 import { MediasoupWorkerManager } from "./media/MediasoupWorkerManager";
+import { MediaRoomWrapper } from "./media/MediaRoomWrapper";
 export class App {
     private _app : Application;
     private _server: HTTPServer
@@ -36,9 +37,12 @@ export class App {
         wss.init();
     }
 
-    public mediasoupworker () : void {
+    public async mediasoupworker () : Promise<void> {
         const media =  new MediasoupWorkerManager();
-        media.init();
+        await media.init();
+        // const worker = media.getNextWorker();
+        // const room = new MediaRoomWrapper("test-room", worker);
+        // await room.init();
     }
 
 }
