@@ -15,8 +15,9 @@ export class MediasoupWorkerManager {
     for (let i = 0; i < this.workerCount; i++) {
         const worker = await mediasoup.createWorker({
             logLevel: "warn",
-            rtcMaxPort: 40000,
-            rtcMinPort: 49999,
+            logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp'],
+            rtcMaxPort: 49999,
+            rtcMinPort: 40000,
         });
 
         worker.on("died", () => {
