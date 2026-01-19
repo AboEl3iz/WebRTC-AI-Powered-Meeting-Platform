@@ -42,3 +42,17 @@ src/
 
 ```
 
+---
+
+### SOME NOTES
+
+
+> 
+    This project should be run on Linux, WSL, or macOS.
+
+    Running it on Windows is not supported.
+
+
+
+
+

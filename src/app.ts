@@ -14,6 +14,7 @@ export class App {
     }
 
 
+
     private setMiddlewares(): void {
         this._app.use(express.json());
     }

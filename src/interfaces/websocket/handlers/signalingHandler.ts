@@ -1,6 +1,7 @@
 import { any } from "zod";
 import { RoomService } from "../../../services/RoomService";
 import WebSocket from "ws";
+import { WebRtcTransport } from "mediasoup/node/lib/WebRtcTransportTypes";
 interface signalingMessage<T = any> {
     event : string;
     data : T;
@@ -15,7 +16,7 @@ export class SignalingHandler {
     ) {  }
 
 
-    public handle (rawMessage : WebSocket.RawData) : void {
+    public async handle (rawMessage : WebSocket.RawData) : Promise<void> {
         let message : signalingMessage;
         console.log("🔥 SIGNALING MESSAGE RECEIVED" , typeof(rawMessage));
         try {
@@ -39,8 +40,44 @@ export class SignalingHandler {
                 this.handleLeaveRoom(data);
                 break;
 
+            case "produce":
+                const userTransporter : WebRtcTransport | undefined = this.roomservice.getTransport(data.userId);
+                if(!userTransporter){
+                        return this.sendError("Transport not found for user");
+                }
+                const produce  = await userTransporter.produce({
+                        kind : data.kind,
+                        rtpParameters : data.rtpParameters,
+                    });
+
+                this.roomservice.addProducer(data.userId,   produce);
+
+                this.ws.send(
+                    JSON.stringify({
+                        event : "produced",
+                        data : { producerId : produce.id , kind : produce.kind },
+                    })
+                )
+
+                // Broadcast to other users to consume
+                const roomUsers = this.roomservice.getUsersInRoom(data.roomId)!.filter(id => id !== data.userId);
+                roomUsers.forEach(async userId => {
+                    const transport = this.roomservice.getTransport(userId);
+                    if (!transport) return;
+                    const consumer = await transport.consume({
+                        producerId: produce.id,
+                        rtpCapabilities: data.rtpCapabilities,
+                        paused: false
+                    });
+                    this.roomservice.addConsumer(userId, consumer);
+                    // send consumer info to the client (pseudo)
+                    // In real frontend, you send consumer's parameters via WS
+                });
+
+            break;
+
             default :
-                this.sendError("Unknown event type");
+                return this.sendError("Unknown event type");
 
             
         }
