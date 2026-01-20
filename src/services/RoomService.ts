@@ -2,11 +2,14 @@ import * as mediasoup from 'mediasoup';
 type WebRtcTransport = mediasoup.types.WebRtcTransport;
 type Producer = mediasoup.types.Producer;
 type Consumer = mediasoup.types.Consumer;
+import { MediaRoomWrapper } from "../media/MediaRoomWrapper";
+
 export class RoomService {
-    private rooms : Map<string, Set<string>>;
-    private transports : Map<string, WebRtcTransport> ;
-    private producers : Map<string, Producer>;
-    private consumers : Map<string, Consumer>;
+    private rooms: Map<string, Set<string>>;
+    private transports: Map<string, WebRtcTransport>;
+    private producers: Map<string, Producer>;
+    private consumers: Map<string, Consumer>;
+    private mediaRooms: Map<string, MediaRoomWrapper> = new Map();
 
     constructor() {
         this.rooms = new Map<string, Set<string>>();
@@ -32,7 +35,34 @@ export class RoomService {
         return Array.from(this.rooms.get(roomId) || []);
     }
 
+    public getRoom(roomId: string): Set<string> | undefined {
+        return this.rooms.get(roomId);
+    }
+
+    public getMediaRoom(roomId: string): MediaRoomWrapper | undefined {
+        return this.mediaRooms.get(roomId);
+    }
+
+    public async createMediaRoom(
+        roomId: string,
+        worker: mediasoup.types.Worker
+    ): Promise<MediaRoomWrapper> {
+        if (this.mediaRooms.has(roomId)) {
+            return this.mediaRooms.get(roomId)!;
+        }
+
+        const room = new MediaRoomWrapper(roomId, worker);
+        await room.init();
+
+        this.mediaRooms.set(roomId, room);
+        return room;
+    }
+
     
+
+
+
+
 
     // Transports
     public addTransport(userId: string, transport: WebRtcTransport) {

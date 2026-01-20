@@ -2,6 +2,7 @@ import { any } from "zod";
 import { RoomService } from "../../../services/RoomService";
 import WebSocket from "ws";
 import { WebRtcTransport } from "mediasoup/node/lib/WebRtcTransportTypes";
+import { MediasoupWorkerManager } from "../../../media/MediasoupWorkerManager";
 interface signalingMessage<T = any> {
     event : string;
     data : T;
@@ -10,9 +11,11 @@ interface signalingMessage<T = any> {
 
 
 export class SignalingHandler {
+    
     constructor(
         private ws : WebSocket,
-        private roomservice : RoomService
+        private roomservice : RoomService,
+        private mediasoupWorkerManager: MediasoupWorkerManager
     ) {  }
 
 
@@ -26,6 +29,7 @@ export class SignalingHandler {
         }
 
         const {event , data} = message;
+        const {roomId , userId , direction,  dtlsParameters } = data;
          
         if (!event){
             return this.sendError("event is required");
@@ -41,6 +45,9 @@ export class SignalingHandler {
                 break;
 
             case "produce":
+                const roomm = this.roomservice.getMediaRoom(data.roomId);  
+                if(!roomm) return this.sendError("Room not found");
+
                 const userTransporter : WebRtcTransport | undefined = this.roomservice.getTransport(data.userId);
                 if(!userTransporter){
                         return this.sendError("Transport not found for user");
@@ -67,14 +74,45 @@ export class SignalingHandler {
                     const consumer = await transport.consume({
                         producerId: produce.id,
                         rtpCapabilities: data.rtpCapabilities,
-                        paused: false
+                        paused: false,
+                        
                     });
                     this.roomservice.addConsumer(userId, consumer);
+                    console.log(`🧩 Consumer created for peer=${userId} consuming producer=${produce.id}`);
                     // send consumer info to the client (pseudo)
                     // In real frontend, you send consumer's parameters via WS
                 });
 
                 break;
+
+            case "create-transport":
+                
+                const room = this.roomservice.getMediaRoom(roomId);  
+                if(!room) return this.sendError("Room not found");
+                const transport = await room.createWebRtcTransport(userId, direction);
+                this.ws.send(
+                    JSON.stringify({
+                        event : "transport-created",
+                        data : transport.getTransportParams(),
+                    })
+                );
+                break;
+
+            case "connect-transport" :
+                
+               const mediaRoom = this.roomservice.getMediaRoom(roomId);
+               const transportToConnect = mediaRoom?.getTransport(userId, direction);
+               if (!transportToConnect) {
+                    return this.sendError("Transport not found for user");
+               }
+               await transportToConnect.connect(dtlsParameters);
+
+               this.ws.send(
+                JSON.stringify({
+                    event: "transport-connected",
+                    data: { direction },
+                })
+               )
 
             default :
                 return this.sendError("Unknown event type");
@@ -90,7 +128,7 @@ export class SignalingHandler {
             return this.sendError("userId and RoomId are required");
         }
 
-        this.roomservice.addUserToRoom(roomId, userId);
+        this.roomservice.removeUserFromRoom(roomId, userId);
         this.ws.send(
             JSON.stringify(
                 {
@@ -107,7 +145,13 @@ export class SignalingHandler {
             return this.sendError("userId and RoomId are required");
         }
 
-        this.roomservice.removeUserFromRoom(roomId,userId);
+        this.roomservice.addUserToRoom(roomId,userId);
+        let room = this.roomservice.getMediaRoom(roomId);
+        if(!room){
+            const worker = this.mediasoupWorkerManager.getNextWorker();
+            this.roomservice.createMediaRoom(roomId, worker);
+            
+        }
         this.ws.send(
             JSON.stringify(
                 {

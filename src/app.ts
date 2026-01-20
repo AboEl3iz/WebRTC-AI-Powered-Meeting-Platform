@@ -39,20 +39,20 @@ export class App {
     }
 
     public async mediasoupworker(): Promise<void> {
-        const media = new MediasoupWorkerManager();
-        await media.init();
-        const worker = media.getNextWorker();
-        const room = new MediaRoomWrapper("test-room", worker);
-        await room.init();
+        // const media = new MediasoupWorkerManager();
+        // await media.init();
+        // const worker = media.getNextWorker();
+        // const room = new MediaRoomWrapper("test-room", worker);
+        // await room.init();
 
-        const router = room.getRouter();
+        // const router = room.getRouter();
         
 
-        const sendTransport = await room.createWebRtcTransport("peer1", "send");
-        console.log("Send transport ID:", sendTransport.getTransportParams().id);
+        // const sendTransport = await room.createWebRtcTransport("peer1", "send");
+        // console.log("Send transport ID:", sendTransport.getTransportParams().id);
 
-        const recvTransport = await room.createWebRtcTransport("peer2", "recv");
-        console.log("Recv transport ID:", recvTransport.getTransportParams().id);
+        // const recvTransport = await room.createWebRtcTransport("peer2", "recv");
+        // console.log("Recv transport ID:", recvTransport.getTransportParams().id);
         
     }
 
