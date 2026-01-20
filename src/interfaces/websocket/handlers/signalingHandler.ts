@@ -110,9 +110,16 @@ export class SignalingHandler {
                this.ws.send(
                 JSON.stringify({
                     event: "transport-connected",
-                    data: { direction },
+                    data: { 
+                        id: transportToConnect.getTransportParams().id,
+                        iceParameters: transportToConnect.getTransportParams().iceParameters,
+                        iceCandidates: transportToConnect.getTransportParams().iceCandidates,
+                        dtlsParameters: transportToConnect.getTransportParams().dtlsParameters,
+                        direction
+                     },
                 })
-               )
+               );
+                break;
 
             default :
                 return this.sendError("Unknown event type");
