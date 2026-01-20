@@ -6,7 +6,7 @@ export class MediasoupWorkerManager {
   private numCores = os.cpus().length;
   private workers: Worker[] = [];
   private nextWorkerIndex: number = 0;
-  private workerCount: number = 2;
+  private workerCount: number = this.numCores / 2;
   constructor(){
     console.log(`💻 Number of CPU cores available: ${this.numCores}`);
   }

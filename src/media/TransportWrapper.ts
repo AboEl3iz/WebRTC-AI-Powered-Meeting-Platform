@@ -1,9 +1,17 @@
 import * as mediasoup from 'mediasoup';
 type WebRtcTransport = mediasoup.types.WebRtcTransport;
 
-export class TransportWrapper {
-    constructor(public transport: WebRtcTransport) {
+interface ITransportWrapperParams {
+    id:string;
+    iceParameters:mediasoup.types.IceParameters;
+    iceCandidates:mediasoup.types.IceCandidate[];
+    dtlsParameters:mediasoup.types.DtlsParameters;
 
+} 
+export class TransportWrapper {
+    private transport: WebRtcTransport;
+    constructor( transport: WebRtcTransport) {
+        this.transport = transport;
     }
 
     async connect(dtlsParameters: mediasoup.types.DtlsParameters) {
@@ -20,5 +28,14 @@ export class TransportWrapper {
 
     async close() {
         this.transport.close();
+    }
+
+    public getTransportParams(): ITransportWrapperParams {
+        return {
+            id: this.transport.id,
+            iceParameters: this.transport.iceParameters,
+            iceCandidates: this.transport.iceCandidates,
+            dtlsParameters: this.transport.dtlsParameters,
+        };
     }
 }

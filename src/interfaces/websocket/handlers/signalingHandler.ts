@@ -74,7 +74,7 @@ export class SignalingHandler {
                     // In real frontend, you send consumer's parameters via WS
                 });
 
-            break;
+                break;
 
             default :
                 return this.sendError("Unknown event type");
