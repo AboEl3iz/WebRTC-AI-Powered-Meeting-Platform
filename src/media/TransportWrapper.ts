@@ -1,41 +1,47 @@
-import * as mediasoup from 'mediasoup';
+import * as mediasoup from "mediasoup";
+
 type WebRtcTransport = mediasoup.types.WebRtcTransport;
 
-interface ITransportWrapperParams {
-    id:string;
-    iceParameters:mediasoup.types.IceParameters;
-    iceCandidates:mediasoup.types.IceCandidate[];
-    dtlsParameters:mediasoup.types.DtlsParameters;
+export interface ITransportWrapperParams {
+    id: string;
+    iceParameters: mediasoup.types.IceParameters;
+    iceCandidates: mediasoup.types.IceCandidate[];
+}
 
-} 
 export class TransportWrapper {
-    private transport: WebRtcTransport;
-    constructor( transport: WebRtcTransport) {
-        this.transport = transport;
-    }
+    constructor(private transport: WebRtcTransport) { }
 
     async connect(dtlsParameters: mediasoup.types.DtlsParameters) {
         await this.transport.connect({ dtlsParameters });
     }
 
-    async produce(kind: "audio" | "video", rtpParameters: any): Promise<mediasoup.types.Producer> {
-        return await this.transport.produce({ kind, rtpParameters });
+    async produce(params: {
+        kind: "audio" | "video";
+        rtpParameters: any;
+    }): Promise<mediasoup.types.Producer> {
+        return await this.transport.produce(params);
     }
 
-    async consume(producerId: string, rtpCapabilities: any): Promise<mediasoup.types.Consumer> {
-        return await this.transport.consume({ producerId, rtpCapabilities, paused: false });
+    async consume(params: {
+        producerId: string;
+        rtpCapabilities: any;
+    }): Promise<mediasoup.types.Consumer> {
+        return await this.transport.consume({
+            producerId: params.producerId,
+            rtpCapabilities: params.rtpCapabilities,
+            paused: false,
+        });
     }
 
-    async close() {
+    close() {
         this.transport.close();
     }
 
-    public getTransportParams(): ITransportWrapperParams {
+    getTransportParams(): ITransportWrapperParams {
         return {
             id: this.transport.id,
             iceParameters: this.transport.iceParameters,
             iceCandidates: this.transport.iceCandidates,
-            dtlsParameters: this.transport.dtlsParameters,
         };
     }
 }

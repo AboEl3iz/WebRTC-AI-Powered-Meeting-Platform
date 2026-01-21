@@ -44,6 +44,10 @@ export class MediaRoomWrapper {
         return this.router
 
     }
+    public canConsume(producerId: string, rtpCapabilities: any): boolean {
+        return this.router.canConsume({ producerId, rtpCapabilities });
+    }
+
 
     /**
      * 
@@ -51,7 +55,7 @@ export class MediaRoomWrapper {
         userId-recv
 
      */
-    public async createWebRtcTransport(userId:string , direction: "send" | "recv"): Promise<TransportWrapper> {
+    public async createWebRtcTransport(userId: string, direction: "send" | "recv"): Promise<TransportWrapper> {
         const transport = await this.router.createWebRtcTransport({
             listenIps: [{ ip: "127.0.0.1", announcedIp: undefined }],
             enableUdp: true,
@@ -63,14 +67,19 @@ export class MediaRoomWrapper {
         const key = `${userId}-${direction}`;
         this.transports.set(key, transportwrapper);
         console.log(
-        `🚚 Transport created for peer=${userId}, direction=${direction}`
+            `🚚 Transport created for peer=${userId}, direction=${direction}`
         );
         return transportwrapper;
     }
 
-    public getTransport(userId:string , direction: "send" | "recv"): TransportWrapper | undefined {
+    public getTransport(userId: string, direction: "send" | "recv"): TransportWrapper | undefined {
         return this.transports.get(`${userId}-${direction}`);
     }
+
+    close() {
+        this.router.close();
+    }
+
 
 
 }

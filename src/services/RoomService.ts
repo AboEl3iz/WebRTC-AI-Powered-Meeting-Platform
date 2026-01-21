@@ -1,52 +1,80 @@
-import * as mediasoup from 'mediasoup';
+import * as mediasoup from "mediasoup";
+import WebSocket from "ws";
+import { MediaRoomWrapper } from "../media/MediaRoomWrapper";
+import { TransportWrapper } from "../media/TransportWrapper";
 type WebRtcTransport = mediasoup.types.WebRtcTransport;
 type Producer = mediasoup.types.Producer;
 type Consumer = mediasoup.types.Consumer;
-import { MediaRoomWrapper } from "../media/MediaRoomWrapper";
+
+interface Peer {
+    socket: WebSocket;
+    transports: Map<"send" | "recv", TransportWrapper>;
+    producers: Map<string, Producer>;
+    consumers: Map<string, Consumer>;
+}
 
 export class RoomService {
-    private rooms: Map<string, Set<string>>;
-    private transports: Map<string, WebRtcTransport>;
-    private producers: Map<string, Producer>;
-    private consumers: Map<string, Consumer>;
-    private mediaRooms: Map<string, MediaRoomWrapper> = new Map();
+    private rooms = new Map<string, Map<string, Peer>>();
+    private mediaRooms = new Map<string, MediaRoomWrapper>();
 
-    constructor() {
-        this.rooms = new Map<string, Set<string>>();
-        this.transports = new Map<string, WebRtcTransport>();
-        this.producers = new Map<string, Producer>();
-        this.consumers = new Map<string, Consumer>();
-    }
+    /* ================= USERS ================= */
 
-    public addUserToRoom(roomId: string, userId: string): void {
+    public addUserToRoom(roomId: string, userId: string, socket: WebSocket) {
         if (!this.rooms.has(roomId)) {
-            this.rooms.set(roomId, new Set<string>());
+            this.rooms.set(roomId, new Map());
         }
-        this.rooms.get(roomId)?.add(userId);
+
+        this.rooms.get(roomId)!.set(userId, {
+            socket,
+            transports: new Map(),
+            producers: new Map(),
+            consumers: new Map()
+        });
     }
 
-    public removeUserFromRoom(roomId: string, userId: string): void {
+    public removeUserFromRoom(roomId: string, userId: string) {
         const room = this.rooms.get(roomId);
         if (!room) return;
+
+        const peer = room.get(userId);
+        if (!peer) return;
+
+        peer.producers.forEach(p => p.close());
+        peer.consumers.forEach(c => c.close());
+        peer.transports.forEach(t => t.close());
+
         room.delete(userId);
+
+        if (room.size === 0) {
+        this.rooms.delete(roomId);
+
+        const mediaRoom = this.mediaRooms.get(roomId);
+        mediaRoom?.close(); 
+        this.mediaRooms.delete(roomId);
+    }
     }
 
-    public getUsersInRoom(roomId: string): string[] | undefined {
-        return Array.from(this.rooms.get(roomId) || []);
+    public getUsersInRoom(roomId: string): string[] {
+        return Array.from(this.rooms.get(roomId)?.keys() || []);
     }
 
-    public getRoom(roomId: string): Set<string> | undefined {
-        return this.rooms.get(roomId);
+    public getUserSocket(userId: string): WebSocket | undefined {
+        for (const room of this.rooms.values()) {
+            const peer = room.get(userId);
+            if (peer) return peer.socket;
+        }
     }
 
-    public getMediaRoom(roomId: string): MediaRoomWrapper | undefined {
+    /* ================= MEDIA ROOM ================= */
+
+    public getMediaRoom(roomId: string) {
         return this.mediaRooms.get(roomId);
     }
 
     public async createMediaRoom(
         roomId: string,
         worker: mediasoup.types.Worker
-    ): Promise<MediaRoomWrapper> {
+    ) {
         if (this.mediaRooms.has(roomId)) {
             return this.mediaRooms.get(roomId)!;
         }
@@ -58,36 +86,72 @@ export class RoomService {
         return room;
     }
 
-    
+    /* ================= TRANSPORT ================= */
 
-
-
-
-
-    // Transports
-    public addTransport(userId: string, transport: WebRtcTransport) {
-        this.transports.set(userId, transport);
+    public addTransport(
+        roomId: string,
+        userId: string,
+        direction: "send" | "recv",
+        transport: TransportWrapper
+    ) {
+        this.rooms.get(roomId)
+            ?.get(userId)
+            ?.transports.set(direction, transport);
     }
 
-    public getTransport(userId: string) {
-        return this.transports.get(userId);
+    public getTransport(
+        roomId: string,
+        userId: string,
+        direction: "send" | "recv"
+    ) {
+        return this.rooms
+            .get(roomId)
+            ?.get(userId)
+            ?.transports.get(direction);
     }
 
-    // Producers
-    public addProducer(userId: string, producer: Producer) {
-        this.producers.set(userId, producer);
+    /* ================= PRODUCER ================= */
+
+    public addProducer(
+        roomId: string,
+        userId: string,
+        producer: Producer
+    ) {
+        this.rooms
+            .get(roomId)
+            ?.get(userId)
+            ?.producers.set(producer.id, producer);
     }
 
-    public getProducer(userId: string) {
-        return this.producers.get(userId);
+    public getProducer(producerId: string): Producer | undefined {
+        for (const room of this.rooms.values()) {
+            for (const peer of room.values()) {
+                const producer = peer.producers.get(producerId);
+                if (producer) return producer;
+            }
+        }
     }
 
-    // Consumers
-    public addConsumer(userId: string, consumer: Consumer) {
-        this.consumers.set(userId, consumer);
+    public getProducers(roomId: string): Producer[] {
+        const producers: Producer[] = [];
+        this.rooms.get(roomId)?.forEach(peer => {
+            peer.producers.forEach(p => producers.push(p));
+        });
+        return producers;
     }
 
-    public getConsumer(userId: string) {
-        return this.consumers.get(userId);
+    /* ================= CONSUMER ================= */
+
+    public addConsumer(
+        roomId: string,
+        userId: string,
+        consumer: Consumer
+    ) {
+        this.rooms
+            .get(roomId)
+            ?.get(userId)
+            ?.consumers.set(consumer.id, consumer);
     }
+
+
 }
