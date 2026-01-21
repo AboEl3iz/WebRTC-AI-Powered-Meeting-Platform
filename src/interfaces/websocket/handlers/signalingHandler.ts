@@ -102,10 +102,15 @@ export class SignalingHandler {
     const transport = await room.createWebRtcTransport(userId, direction);
 
     this.roomservice.addTransport(roomId, userId, direction, transport);
+    console.log("Transport created:", transport.getTransportParams());
+    
 
     this.ws.send(JSON.stringify({
       event: "transport-created",
-      data: transport.getTransportParams()
+      data: {
+        direction,
+        transport: transport.getTransportParams()
+      }
     }));
   }
 
@@ -132,8 +137,7 @@ export class SignalingHandler {
     this.roomservice.addProducer(roomId, userId, producer);
 
     
-    const peers = this.roomservice.getUsersInRoom(roomId)
-      .filter(id => id !== userId);
+    const peers = this.roomservice.getUsersInRoom(roomId);
 
     peers.forEach(peerId => {
       const peerSocket = this.roomservice.getUserSocket(peerId);
