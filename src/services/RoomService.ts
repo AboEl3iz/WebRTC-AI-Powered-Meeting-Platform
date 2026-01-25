@@ -58,11 +58,13 @@ export class RoomService {
         return Array.from(this.rooms.get(roomId)?.keys() || []);
     }
 
+    // In RoomService.ts
     public getUserSocket(userId: string): WebSocket | undefined {
         for (const room of this.rooms.values()) {
             const peer = room.get(userId);
             if (peer) return peer.socket;
         }
+        return undefined;  
     }
 
     /* ================= MEDIA ROOM ================= */
@@ -122,6 +124,9 @@ export class RoomService {
             ?.get(userId)
             ?.producers.set(producer.id, producer);
     }
+
+    
+
 
     public getProducer(producerId: string): Producer | undefined {
         for (const room of this.rooms.values()) {

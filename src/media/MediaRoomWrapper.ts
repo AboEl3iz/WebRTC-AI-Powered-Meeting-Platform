@@ -14,13 +14,16 @@ export class MediaRoomWrapper {
             mimeType: "audio/opus",
             clockRate: 48000,
             channels: 2,
-            preferredPayloadType: 0
+            preferredPayloadType: 100
         },
         {
             kind: "video",
             mimeType: "video/VP8",
             clockRate: 90000,
-            preferredPayloadType: 1
+            parameters: {
+                "x-google-start-bitrate": 1000
+            },
+            preferredPayloadType: 101
         },
     ];
 
@@ -57,7 +60,7 @@ export class MediaRoomWrapper {
      */
     public async createWebRtcTransport(userId: string, direction: "send" | "recv"): Promise<TransportWrapper> {
         const transport = await this.router.createWebRtcTransport({
-            listenIps: [{ ip: "127.0.0.1", announcedIp: undefined }],
+            listenIps: [{ ip: "0.0.0.0", announcedIp: "127.0.0.1" }],
             enableUdp: true,
             enableTcp: true,
             preferUdp: true,

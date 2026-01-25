@@ -44,4 +44,7 @@ export class TransportWrapper {
             iceCandidates: this.transport.iceCandidates,
         };
     }
+    getDtlsParameters(): mediasoup.types.DtlsParameters {
+    return this.transport.dtlsParameters;
+}
 }
