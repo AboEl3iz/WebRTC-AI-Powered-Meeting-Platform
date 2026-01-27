@@ -26,8 +26,9 @@ export class WebSocketServer {
 
             ws.on('close', () => {
                 console.log('Client disconnected');
-                    
+                _SignalingHandler.close();
                 });
+               
 
 
             

@@ -8,6 +8,8 @@ interface SignalingMessage<T = any> {
 }
 
 export class SignalingHandler {
+  private currentRoomId?: string;
+  private currentUserId?: string;
   constructor(
     private ws: WebSocket,
     private roomservice: RoomService,
@@ -24,6 +26,7 @@ export class SignalingHandler {
     }
 
     const { event, data } = message;
+
 
     switch (event) {
       case "join_room":
@@ -49,30 +52,28 @@ export class SignalingHandler {
     }
   }
 
-  public async close(rawMessage: WebSocket.RawData): Promise<void> {
-    let message: SignalingMessage;
+  public async close(): Promise<void> {
 
-    try {
-      message = JSON.parse(rawMessage.toString());
-    } catch {
-      return this.sendError("Invalid JSON");
+    if (!this.currentRoomId || !this.currentUserId) {
+      console.error("Could not close: User was not fully joined.");
+      return;
     }
 
-    const { event, data } = message;
-    const { roomId, userId } = data;
-    // 1. Tell your room service to remove the user and close their producers
-    this.roomservice.removeUserFromRoom(roomId, userId); 
+    console.log(`Cleaning up for ${this.currentUserId} in ${this.currentRoomId}`);
 
-    // 2. Broadcast to everyone else that this user has left
-    const peers = this.roomservice.getUsersInRoom(roomId);
+    // 1. Remove user (this closes producers on the server)
+    this.roomservice.removeUserFromRoom(this.currentRoomId, this.currentUserId);
+
+    // 2. Broadcast 'peer-left'
+    const peers = this.roomservice.getUsersInRoom(this.currentRoomId);
     peers.forEach(peerId => {
-        const socket = this.roomservice.getUserSocket(peerId);
-        if (socket) {
-            socket.send(JSON.stringify({
-                event: 'peer-left',
-                data: { userId: userId }
-            }));
-        }
+      const socket = this.roomservice.getUserSocket(peerId);
+      if (socket && socket !== this.ws) {
+        socket.send(JSON.stringify({
+          event: 'peer-left',
+          data: { userId: this.currentUserId }
+        }));
+      }
     });
   }
 
@@ -80,7 +81,8 @@ export class SignalingHandler {
 
   private async handleJoinRoom({ roomId, userId }: any) {
     this.roomservice.addUserToRoom(roomId, userId, this.ws);
-
+    this.currentRoomId = roomId;
+    this.currentUserId = userId;
     let mediaRoom = this.roomservice.getMediaRoom(roomId);
     if (!mediaRoom) {
       const worker = this.mediasoupWorkerManager.getNextWorker();
@@ -167,26 +169,32 @@ export class SignalingHandler {
     const producer = await transport.produce({ kind, rtpParameters });
     this.roomservice.addProducer(roomId, userId, producer);
 
-    // --- ADD THIS LOGIC ---
+    
     producer.on('transportclose', () => producer.close());
 
+    
     producer.on('@close', () => {
       console.log(`Producer ${producer.id} closed, notifying peers...`);
       const peers = this.roomservice.getUsersInRoom(roomId);
+
       peers.forEach(peerId => {
-        if (peerId === userId) return; // Don't notify the person who closed it
+        if (peerId === userId) return; // Don't notify the sender
+
         const peerSocket = this.roomservice.getUserSocket(peerId);
         if (peerSocket) {
           peerSocket.send(JSON.stringify({
             event: "producer-closed",
-            data: { producerId: producer.id }
+            data: {
+              producerId: producer.id,
+              userId: userId
+            }
           }));
         }
       });
     });
 
-    // 1. Reply to the SENDER (The Fix)
-    // We MUST send back the producerId and the server-side rtpParameters
+
+    
     this.ws.send(JSON.stringify({
       event: "produced",
       data: {
@@ -209,24 +217,7 @@ export class SignalingHandler {
       }
     });
   }
-  // ```
 
-  // ## **After applying these fixes:**
-
-  // 1. **Restart your server** (important!)
-  // 2. **Refresh the browser page**
-  // 3. **Join the room again**
-
-  // You should then see logs like:
-  // ```
-  // 🔗 Send transport connecting...
-  // ✅ Transport send connected
-  // ✅ Transport recv connected
-  // 🎥 Starting media...
-  // 🎤 Producing audio...
-  // ✅ Audio: [id]
-  // 📹 Producing video...
-  // ✅ Video: [id]
 
   /* ================= CONSUMER ================= */
 
