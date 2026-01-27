@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import { RoomService } from "../../../services/RoomService";
 import { MediasoupWorkerManager } from "../../../media/MediasoupWorkerManager";
+import { Recorder } from "./record";
 
 interface SignalingMessage<T = any> {
   event: string;
@@ -10,6 +11,7 @@ interface SignalingMessage<T = any> {
 export class SignalingHandler {
   private currentRoomId?: string;
   private currentUserId?: string;
+  private recorders = new Map<string, Recorder>();
   constructor(
     private ws: WebSocket,
     private roomservice: RoomService,
@@ -46,6 +48,15 @@ export class SignalingHandler {
 
       case "consume":
         return this.handleConsume(data);
+
+      case "close-producer":
+        return this.handleCloseProducer(data);
+
+      case "start-recording":
+        return this.handleStartRecording(data);
+
+      case "stop-recording":
+        return this.handleStopRecording(data);
 
       default:
         return this.sendError("Unknown event");
@@ -169,32 +180,53 @@ export class SignalingHandler {
     const producer = await transport.produce({ kind, rtpParameters });
     this.roomservice.addProducer(roomId, userId, producer);
 
-    
-    producer.on('transportclose', () => producer.close());
+    console.log(`📹 Producer created: ${producer.id} (kind: ${kind}) by user: ${userId}`);
 
-    
-    producer.on('@close', () => {
-      console.log(`Producer ${producer.id} closed, notifying peers...`);
+    // FIX: Add transportclose handler
+    producer.on('transportclose', () => {
+      console.log(`🚚 Transport closed for producer ${producer.id}`);
+      producer.close();
+    });
+
+
+    const broadcastClose = () => {
+      console.log(`❌ Producer ${producer.id} closed (kind: ${kind}, user: ${userId})`);
+
       const peers = this.roomservice.getUsersInRoom(roomId);
+      console.log(`📢 Broadcasting producer-closed to ${peers.length} peers`);
 
+      let notifiedCount = 0;
       peers.forEach(peerId => {
-        if (peerId === userId) return; // Don't notify the sender
+        if (peerId === userId) {
+          console.log(`  ⏭️  Skipping self: ${peerId}`);
+          return;
+        }
 
         const peerSocket = this.roomservice.getUserSocket(peerId);
-        if (peerSocket) {
+        if (peerSocket && peerSocket.readyState === WebSocket.OPEN) {
           peerSocket.send(JSON.stringify({
             event: "producer-closed",
             data: {
               producerId: producer.id,
-              userId: userId
+              userId: userId,
+              kind: kind
             }
           }));
+          notifiedCount++;
+          console.log(`  ✅ Notified peer: ${peerId}`);
+        } else {
+          console.log(`  ❌ Could not notify peer: ${peerId} (socket not ready)`);
         }
       });
-    });
 
+      console.log(`📢 Notified ${notifiedCount} peers about producer ${producer.id} closure`);
+    };
 
-    
+    // Listen to both possible event names
+    // producer.on('close', broadcastClose);
+    producer.on('@close', broadcastClose);
+
+    // 1. Acknowledge to the producer
     this.ws.send(JSON.stringify({
       event: "produced",
       data: {
@@ -254,6 +286,129 @@ export class SignalingHandler {
       }
     }));
   }
+
+  /* ================= CLOSE PRODUCER ================= */
+
+  private async handleCloseProducer({ roomId, userId, producerId }: any) {
+    console.log(`🛑 Received close-producer request`);
+    console.log(`   roomId: ${roomId}`);
+    console.log(`   userId: ${userId}`);
+    console.log(`   producerId: ${producerId}`);
+
+    const producer = this.roomservice.getProducer(producerId);
+
+    if (!producer) {
+      console.log(`❌ Producer ${producerId} not found in room service`);
+      return this.sendError("Producer not found");
+    }
+
+    console.log(`✅ Found producer: ${producer.id}, kind: ${producer.kind}`);
+
+    // Close the producer on the server
+    producer.close();
+    console.log(`✅ Producer ${producerId} closed on server`);
+
+    // Manually broadcast to other peers (since close event might not fire)
+    const peers = this.roomservice.getUsersInRoom(roomId);
+    console.log(`📢 Room has ${peers.length} total peers: ${JSON.stringify(peers)}`);
+
+    let notifiedCount = 0;
+    peers.forEach(peerId => {
+      if (peerId === userId) {
+        console.log(`  ⏭️  Skipping self: ${peerId}`);
+        return;
+      }
+
+      console.log(`  🔍 Trying to notify peer: ${peerId}`);
+      const peerSocket = this.roomservice.getUserSocket(peerId);
+
+      if (!peerSocket) {
+        console.log(`    ❌ No socket found for peer: ${peerId}`);
+        return;
+      }
+
+      console.log(`    Socket state: ${peerSocket.readyState} (OPEN=${WebSocket.OPEN})`);
+
+      if (peerSocket.readyState === WebSocket.OPEN) {
+        const message = JSON.stringify({
+          event: "producer-closed",
+          data: {
+            producerId: producer.id,
+            userId: userId,
+            kind: producer.kind
+          }
+        });
+        console.log(`    📤 Sending: ${message}`);
+        peerSocket.send(message);
+        notifiedCount++;
+        console.log(`    ✅ Successfully sent to peer: ${peerId}`);
+      } else {
+        console.log(`    ❌ Socket not open for peer: ${peerId}`);
+      }
+    });
+
+    console.log(`📢 Total notified: ${notifiedCount} peers about producer ${producerId} closure`);
+  }
+
+  /**=======================Recorder Management=========== */
+  private async handleStartRecording(data: any) {
+    const { roomId, userId, videoProducerId, audioProducerId } = data;
+
+    // 1. Check if recording is already active
+    if (this.recorders.has(roomId)) {
+      return this.sendError("Recording is already in progress.");
+    }
+
+    const router = this.roomservice.getRouter(roomId);
+    const videoProducer = this.roomservice.getProducer(videoProducerId);
+    const audioProducer = this.roomservice.getProducer(audioProducerId);
+
+    if (!router || !videoProducer || !audioProducer) {
+      return this.sendError("Required producers or router not found.");
+    }
+
+    // 2. Initialize and start the recorder
+    const recorder = new Recorder(roomId);
+    try {
+      await recorder.start(router, videoProducer, audioProducer);
+      this.recorders.set(roomId, recorder);
+
+      // 3. Notify all peers that recording has started
+      this.broadcastToRoom(roomId, {
+        event: 'recording-started',
+        data: { startedBy: userId }
+      });
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      this.sendError("Server failed to start the recording process.");
+    }
+  }
+
+  private handleStopRecording(data: any) {
+    const { roomId } = data;
+    const recorder = this.recorders.get(roomId);
+
+    if (recorder) {
+      recorder.stop();
+      this.recorders.delete(roomId);
+
+      this.broadcastToRoom(roomId, {
+        event: 'recording-stopped',
+        data: {}
+      });
+    }
+  }
+
+  private broadcastToRoom(roomId: string, message: SignalingMessage) {
+    const peers = this.roomservice.getUsersInRoom(roomId);
+    peers.forEach(peerId => {
+      const socket = this.roomservice.getUserSocket(peerId);
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(message));
+      }
+    });
+  }
+
 
   /* ================= ERROR ================= */
 

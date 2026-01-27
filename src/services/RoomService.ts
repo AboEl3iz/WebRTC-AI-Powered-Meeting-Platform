@@ -46,12 +46,12 @@ export class RoomService {
         room.delete(userId);
 
         if (room.size === 0) {
-        this.rooms.delete(roomId);
+            this.rooms.delete(roomId);
 
-        const mediaRoom = this.mediaRooms.get(roomId);
-        mediaRoom?.close(); 
-        this.mediaRooms.delete(roomId);
-    }
+            const mediaRoom = this.mediaRooms.get(roomId);
+            mediaRoom?.close();
+            this.mediaRooms.delete(roomId);
+        }
     }
 
     public getUsersInRoom(roomId: string): string[] {
@@ -64,13 +64,17 @@ export class RoomService {
             const peer = room.get(userId);
             if (peer) return peer.socket;
         }
-        return undefined;  
+        return undefined;
     }
 
     /* ================= MEDIA ROOM ================= */
 
     public getMediaRoom(roomId: string) {
         return this.mediaRooms.get(roomId);
+    }
+
+    public getRouter(roomId: string) {
+        return this.mediaRooms.get(roomId)?.getRouter();
     }
 
     public async createMediaRoom(
@@ -125,7 +129,7 @@ export class RoomService {
             ?.producers.set(producer.id, producer);
     }
 
-    
+
 
 
     public getProducer(producerId: string): Producer | undefined {
