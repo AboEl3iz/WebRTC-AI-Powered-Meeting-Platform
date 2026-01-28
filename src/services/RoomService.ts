@@ -8,6 +8,8 @@ type Consumer = mediasoup.types.Consumer;
 
 interface Peer {
     socket: WebSocket;
+    name: string;
+    email: string;
     transports: Map<"send" | "recv", TransportWrapper>;
     producers: Map<string, Producer>;
     consumers: Map<string, Consumer>;
@@ -19,13 +21,15 @@ export class RoomService {
 
     /* ================= USERS ================= */
 
-    public addUserToRoom(roomId: string, userId: string, socket: WebSocket) {
+    public addUserToRoom(roomId: string, userId: string, name: string, email: string, socket: WebSocket) {
         if (!this.rooms.has(roomId)) {
             this.rooms.set(roomId, new Map());
         }
 
         this.rooms.get(roomId)!.set(userId, {
             socket,
+            name,
+            email,
             transports: new Map(),
             producers: new Map(),
             consumers: new Map()
@@ -65,6 +69,12 @@ export class RoomService {
             if (peer) return peer.socket;
         }
         return undefined;
+    }
+
+    public getPeerInfo(roomId: string, userId: string) {
+        const peer = this.rooms.get(roomId)?.get(userId);
+        if (!peer) return undefined;
+        return { name: peer.name, email: peer.email };
     }
 
     /* ================= MEDIA ROOM ================= */

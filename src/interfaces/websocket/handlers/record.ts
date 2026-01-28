@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs-extra';
 import path from 'path';
 import net from 'net';
+import Meeting from '../../../models/Meeting';
 
 async function getFreePort(): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -23,14 +24,25 @@ export class Recorder {
     private audioTransport: any;
     private videoConsumer: any;
     private audioConsumer: any;
+    private meetingId: string | null = null;
+    private outputPath: string | null = null;
 
     constructor(private roomId: string) {
         this.sdpPath = path.join(process.cwd(), `recordings/${this.roomId}.sdp`);
     }
 
-    async start(router: any, videoProducer: any, audioProducer: any) {
+    async start(router: any, videoProducer: any, audioProducer: any, participants: { name: string, email: string }[]) {
         const recordingsDir = path.join(process.cwd(), 'recordings');
         await fs.ensureDir(recordingsDir);
+
+        // 0. Create Meeting entry in DB
+        const meeting = new Meeting({
+            roomId: this.roomId,
+            participants,
+            status: 'recording'
+        });
+        await meeting.save();
+        this.meetingId = meeting.id;
 
         // 1. Get free ports for FFmpeg to listen on
         const videoPort = await getFreePort();
@@ -38,7 +50,7 @@ export class Recorder {
 
         // 2. Create PlainTransports for Mediasoup to send RTP
         this.videoTransport = await router.createPlainTransport({
-            listenIp: '127.0.0.1',
+            listenIp: { ip: '127.0.0.1', announcedIp: null },
             rtcpMux: true,
             comedia: false
         });
@@ -87,12 +99,12 @@ export class Recorder {
             a=rtpmap:${videoPayloadType} VP8/90000
             m=audio ${audioPort} RTP/AVP ${audioPayloadType}
             a=rtpmap:${audioPayloadType} opus/48000/2
-        `.trim();
+            `.trim().replace(/^\s+/gm, ''); // This ensures every line starts at column 0
 
         await fs.writeFile(this.sdpPath, sdpContent);
 
         // 6. Spawn FFmpeg process
-        const outputPath = path.join(recordingsDir, `${this.roomId}_${Date.now()}.mp4`);
+        this.outputPath = path.join(recordingsDir, `${this.roomId}_${Date.now()}.mp4`);
 
         this.ffmpegProcess = spawn('ffmpeg', [
             '-loglevel', 'debug',
@@ -102,13 +114,22 @@ export class Recorder {
             '-c:a', 'aac',  // Convert opus to aac for mp4
             '-flags', '+global_header',
             '-y',
-            outputPath
+            this.outputPath
         ]);
 
         this.ffmpegProcess.stderr?.on('data', (data) => console.log(`FFmpeg [${this.roomId}]: ${data}`));
 
-        this.ffmpegProcess.on('close', (code) => {
+        this.ffmpegProcess.on('close', async (code) => {
             console.log(`FFmpeg process for room ${this.roomId} closed with code ${code}`);
+
+            // Update DB status
+            if (this.meetingId) {
+                await Meeting.findOneAndUpdate(
+                    { id: this.meetingId },
+                    { status: 'completed', videoPath: this.outputPath }
+                );
+            }
+
             this.cleanup();
         });
     }
@@ -124,18 +145,18 @@ export class Recorder {
     }
 
     stop() {
-       if (this.ffmpegProcess) {
-        // Use SIGINT to allow FFmpeg to finish writing file headers
-        this.ffmpegProcess.kill('SIGINT'); 
-        
-        this.ffmpegProcess.on('exit', () => {
-            console.log('💾 FFmpeg successfully finished writing the file.');
-            if (fs.existsSync(this.sdpPath)) {
-                fs.removeSync(this.sdpPath); // Clean up the SDP
-            }
-        });
-        
-        this.ffmpegProcess = null;
-    }
+        if (this.ffmpegProcess) {
+            // Use SIGINT to allow FFmpeg to finish writing file headers
+            this.ffmpegProcess.kill('SIGINT');
+
+            this.ffmpegProcess.on('exit', () => {
+                console.log('💾 FFmpeg successfully finished writing the file.');
+                if (fs.existsSync(this.sdpPath)) {
+                    fs.removeSync(this.sdpPath); // Clean up the SDP
+                }
+            });
+
+            this.ffmpegProcess = null;
+        }
     }
 }

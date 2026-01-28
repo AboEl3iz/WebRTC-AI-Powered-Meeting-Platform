@@ -90,8 +90,8 @@ export class SignalingHandler {
 
   /* ================= ROOM ================= */
 
-  private async handleJoinRoom({ roomId, userId }: any) {
-    this.roomservice.addUserToRoom(roomId, userId, this.ws);
+  private async handleJoinRoom({ roomId, userId, name, email }: any) {
+    this.roomservice.addUserToRoom(roomId, userId, name || "Guest", email || "guest@example.com", this.ws);
     this.currentRoomId = roomId;
     this.currentUserId = userId;
     let mediaRoom = this.roomservice.getMediaRoom(roomId);
@@ -370,7 +370,14 @@ export class SignalingHandler {
     // 2. Initialize and start the recorder
     const recorder = new Recorder(roomId);
     try {
-      await recorder.start(router, videoProducer, audioProducer);
+      const peers = this.roomservice.getUsersInRoom(roomId);
+      const participants = peers.map(peerId => {
+        // Need to find peer info. I'll add a helper to RoomService or use existing data if possible.
+        // For now I'll assume I can get it from RoomService (I'll need to add a getter).
+        return (this.roomservice as any).getPeerInfo(roomId, peerId);
+      }).filter(p => p !== undefined);
+
+      await recorder.start(router, videoProducer, audioProducer, participants);
       this.recorders.set(roomId, recorder);
 
       // 3. Notify all peers that recording has started
