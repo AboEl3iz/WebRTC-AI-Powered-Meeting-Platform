@@ -1,4 +1,3 @@
-
 import whisperx
 import torch
 import os
@@ -9,33 +8,59 @@ import logging
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
 warnings.filterwarnings("ignore", category=FutureWarning, module="pyannote")
 
+# Robust Monkeypatch for torch.load FIRST (before any imports that might use it)
+_original_load = torch.load
+def _custom_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return _original_load(*args, **kwargs)
+torch.load = _custom_load
+print("✅ PyTorch torch.load monkeypatched successfully.")
+
 try:
-    from omegaconf import OmegaConf, ListConfig, DictConfig
     from omegaconf import OmegaConf, ListConfig, DictConfig
     from omegaconf.base import Container, ContainerMetadata, Node, Metadata
     from omegaconf.basecontainer import BaseContainer
-    # Remove InterpolationValueNode as it caused import error
     from omegaconf.nodes import AnyNode, ValueNode, StringNode, IntegerNode, FloatNode, BooleanNode
     import typing
     from collections import defaultdict
     from torch.torch_version import TorchVersion
+    
+    # Import pyannote classes - these are critical
+    pyannote_classes = []
+    
     try:
         from pyannote.audio.core.model import Introspection
-    except ImportError:
-        Introspection = None
-        print("⚠️ Could not import pyannote.audio.core.model.Introspection")
+        pyannote_classes.append(Introspection)
+        print("✅ Imported pyannote.audio.core.model.Introspection")
+    except ImportError as e:
+        print(f"⚠️ Could not import pyannote.audio.core.model.Introspection: {e}")
 
     try:
         from pyannote.audio.core.task import Specifications, Problem, Resolution
-    except ImportError:
-        Specifications = None
-        Problem = None
-        Resolution = None
-        print("⚠️ Could not import pyannote.audio.core.task.Specifications or Problem or Resolution")
+        pyannote_classes.extend([Specifications, Problem, Resolution])
+        print(f"✅ Imported pyannote.audio.core.task classes: Specifications, Problem, Resolution")
+    except ImportError as e:
+        print(f"⚠️ Could not import pyannote.audio.core.task classes: {e}")
     
-    # Register ALL omegaconf globals as safe for torch.load (PyTorch 2.6+ security)
-    # Pyannote uses various omegaconf classes in its checkpoints
+    # Additional pyannote classes that might be needed
+    try:
+        from pyannote.audio.core.task import Task
+        pyannote_classes.append(Task)
+        print("✅ Imported pyannote.audio.core.task.Task")
+    except ImportError as e:
+        print(f"⚠️ Could not import Task: {e}")
+    
+    try:
+        from pyannote.audio.core.model import Model
+        pyannote_classes.append(Model)
+        print("✅ Imported pyannote.audio.core.model.Model")
+    except ImportError as e:
+        print(f"⚠️ Could not import Model: {e}")
+    
+    # Register ALL omegaconf and pyannote globals as safe for torch.load (PyTorch 2.6+ security)
     safe_classes = [
+        # OmegaConf classes
         ListConfig, 
         DictConfig, 
         Container, 
@@ -43,6 +68,13 @@ try:
         Node,
         Metadata,
         BaseContainer,
+        AnyNode, 
+        ValueNode, 
+        StringNode, 
+        IntegerNode, 
+        FloatNode, 
+        BooleanNode,
+        # Python built-ins
         typing.Any,
         list,
         dict,
@@ -54,36 +86,28 @@ try:
         bool,
         float,
         bytes,
-        AnyNode, 
-        ValueNode, 
-        StringNode, 
-        IntegerNode, 
-        FloatNode, 
-        BooleanNode,
+        # Torch classes
         TorchVersion,
-        Introspection,
-        Specifications,
-        Problem,
-        Resolution
     ]
-    # Filter out None values (failed imports)
+    
+    # Add pyannote classes
+    safe_classes.extend(pyannote_classes)
+    
+    # Filter out None values (failed imports) - though we shouldn't have any now
     safe_classes = [c for c in safe_classes if c is not None]
     
-    torch.serialization.add_safe_globals(safe_classes)
-    print(f"✅ Registered {len(safe_classes)} OmegaConf globals for safe usage.")
+    # Register with torch
+    if hasattr(torch.serialization, 'add_safe_globals'):
+        torch.serialization.add_safe_globals(safe_classes)
+        print(f"✅ Registered {len(safe_classes)} globals as safe for torch.load")
+        print(f"   Including {len(pyannote_classes)} pyannote classes")
+    else:
+        print("⚠️ torch.serialization.add_safe_globals not available (older PyTorch version)")
+        
 except ImportError as e:
-    print(f"⚠️ OmegaConf import failed: {e}, relying on monkeypatch.")
-except AttributeError:
-    print("⚠️ torch.serialization.add_safe_globals not found (older torch?), skipping.")
-
-# Robust Monkeypatch for torch.load
-# We force it even if it looks patched, just in case.
-_original_load = torch.load
-def _custom_load(*args, **kwargs):
-    if 'weights_only' not in kwargs:
-        kwargs['weights_only'] = False
-    return _original_load(*args, **kwargs)
-torch.load = _custom_load
+    print(f"⚠️ Import failed: {e}, relying on monkeypatch only.")
+except Exception as e:
+    print(f"⚠️ Unexpected error during safe globals registration: {e}")
 
 class WhisperService:
     def __init__(self, device: str = None, compute_type: str = "int8"):
@@ -116,8 +140,4 @@ class WhisperService:
         result = self.model.transcribe(audio, batch_size=batch_size, language="en")
         print("✅ WhisperX Transcription Completed.")
         
-        # Look for alignment models if needed later, 
-        # but for now basic transcription is fine.
         return result
-
-        
