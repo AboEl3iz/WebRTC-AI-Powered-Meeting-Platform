@@ -30,3 +30,9 @@ archive.zip
 .DS_Store
 .env
 .codspeed
+
+input
+output
+.guide.md
+plan.md
+problem.md
