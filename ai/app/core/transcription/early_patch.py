@@ -1,4 +1,7 @@
 import torch
+import logging
+
+logger = logging.getLogger(__name__)
 
 _original_load = torch.load
 
@@ -9,4 +12,4 @@ def _custom_load(*args, **kwargs):
 
 torch.load = _custom_load
 
-print("✅ torch.load patched (weights_only=False)")
+logger.info("✅ torch.load patched (weights_only=False)")

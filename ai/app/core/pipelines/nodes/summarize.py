@@ -3,8 +3,12 @@ from app.core.ai.summarizer import Summarizer
 from app.core.llm.factory import LLMFactory
 import asyncio
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 async def summarize_node(state: PipelineState) -> PipelineState:
-    print("--- [Node] Summarize ---")
+    logger.info("--- [Node] Summarize ---")
     if state.get("error"):
         return state
 

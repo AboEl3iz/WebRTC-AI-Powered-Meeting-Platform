@@ -1,8 +1,12 @@
 from app.core.pipelines.state import PipelineState
 from app.core.audio.extractor import AudioExtractor
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def extract_audio_node(state: PipelineState) -> PipelineState:
-    print("--- [Node] Extract Audio ---")
+    logger.info("--- [Node] Extract Audio ---")
     try:
         input_path = state["input_path"]
         # If input is already audio (wav/mp3), extractor might just copy or return it

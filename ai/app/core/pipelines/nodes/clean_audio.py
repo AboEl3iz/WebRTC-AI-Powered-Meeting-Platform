@@ -1,8 +1,12 @@
 from app.core.pipelines.state import PipelineState
 from app.core.audio.cleaner import AudioCleaner
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def clean_audio_node(state: PipelineState) -> PipelineState:
-    print("--- [Node] Clean Audio ---")
+    logger.info("--- [Node] Clean Audio ---")
     if state.get("error"):
         return state
 

@@ -16,6 +16,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "faster-whisper" },
     { name = "ffmpeg-python" },
     { name = "langchain" },
     { name = "langgraph" },
@@ -31,6 +32,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = "==0.128.0" },
+    { name = "faster-whisper", specifier = ">=1.0.0" },
     { name = "ffmpeg-python", specifier = "==0.2.0" },
     { name = "langchain", specifier = "==1.2.7" },
     { name = "langgraph", specifier = "==1.0.7" },

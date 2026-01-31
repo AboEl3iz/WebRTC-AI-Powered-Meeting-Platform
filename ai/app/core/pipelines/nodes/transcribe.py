@@ -1,21 +1,24 @@
 from app.core.pipelines.state import PipelineState
 from app.core.transcription.whisper_service import WhisperService
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Instantiate service globally or pass via config
 # For simplicity, we instantiate here (re-loading model potentially, but WhisperService has lazy load check)
 whisper_service = WhisperService()
 
 def transcribe_node(state: PipelineState) -> PipelineState:
-    print("--- [Node] Transcribe ---")
+    logger.info("--- [Node] Transcribe ---")
     if state.get("error"):
         return state
 
     try:
         audio_path = state["clean_audio_path"] or state["audio_path"]
         result = whisper_service.transcribe(audio_path)
-        print("FULL RESULT:", result)
-        print("SEGMENTS:", result.get("segments"))
-        print("TEXT LENGTH:", len(result.get("text", "")))
+        logger.debug(f"FULL RESULT: {result}")
+        logger.info(f"SEGMENTS: {result.get('segments')}")
+        logger.info(f"TEXT LENGTH: {len(result.get('text', ''))}")
         
         # Combine segments into full text
         segments = result.get("segments", [])

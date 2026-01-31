@@ -18,8 +18,12 @@ os.makedirs(INPUT_DIR, exist_ok=True)
 # In-memory store for results (use DB in production)
 results_store = {}
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 async def run_pipeline_task(task_id: str, file_path: str):
-    print(f"Starting pipeline for task {task_id}")
+    logger.info(f"Starting pipeline for task {task_id}")
     try:
         initial_state: PipelineState = {
             "input_path": file_path,
@@ -47,10 +51,10 @@ async def run_pipeline_task(task_id: str, file_path: str):
             json.dump(result_data, f, ensure_ascii=False, indent=2)
             
         results_store[task_id] = {"status": "completed", "result": result_data}
-        print(f"Pipeline finished for {task_id}")
+        logger.info(f"Pipeline finished for {task_id}")
         
     except Exception as e:
-        print(f"Pipeline crashed for {task_id}: {e}")
+        logger.error(f"Pipeline crashed for {task_id}: {e}", exc_info=True)
         results_store[task_id] = {"status": "failed", "error": str(e)}
 
 @router.post("/process")

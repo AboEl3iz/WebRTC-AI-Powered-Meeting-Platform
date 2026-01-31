@@ -1,3 +1,7 @@
+from app.core.logging_config import setup_logging
+# Setup logging immediately to capture early patch logs
+setup_logging()
+
 import early_patch
 import uvicorn
 from fastapi import FastAPI

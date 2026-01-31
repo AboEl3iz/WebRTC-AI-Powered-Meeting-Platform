@@ -6,6 +6,7 @@ openai==2.16.0
 langchain==1.2.7
 langgraph==1.0.7
 whisperx==3.7.6
+faster-whisper>=1.0.0
 ffmpeg-python==0.2.0
 python-dotenv==1.2.1
 requests==2.32.5
