@@ -179,7 +179,7 @@ class WhisperService:
     """
     
     def __init__(self, device: str = None, compute_type: str = "int8"):
-        backend_type = os.getenv("TRANSCRIPTION_BACKEND", "faster-whisper").lower()
+        backend_type = os.getenv("TRANSCRIPTION_BACKEND", "whisperx").lower()
         
         if backend_type == "faster-whisper":
             logger.info("📌 Using Faster-Whisper backend (Egyptian Arabic)")
