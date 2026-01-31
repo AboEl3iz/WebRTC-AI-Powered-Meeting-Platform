@@ -89,17 +89,24 @@ export class Recorder {
         const videoPayloadType = this.videoConsumer.rtpParameters.codecs[0].payloadType;
         const audioPayloadType = this.audioConsumer.rtpParameters.codecs[0].payloadType;
 
+        // Extract SSRC from RTP parameters for proper stream identification
+        const videoSsrc = this.videoConsumer.rtpParameters.encodings?.[0]?.ssrc;
+        const audioSsrc = this.audioConsumer.rtpParameters.encodings?.[0]?.ssrc;
+
         const sdpContent = `
-            v=0
-            o=- 0 0 IN IP4 127.0.0.1
-            s=Mediasoup Recording
-            c=IN IP4 127.0.0.1
-            t=0 0
-            m=video ${videoPort} RTP/AVP ${videoPayloadType}
-            a=rtpmap:${videoPayloadType} VP8/90000
-            m=audio ${audioPort} RTP/AVP ${audioPayloadType}
-            a=rtpmap:${audioPayloadType} opus/48000/2
-            `.trim().replace(/^\s+/gm, ''); // This ensures every line starts at column 0
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=Mediasoup Recording
+c=IN IP4 127.0.0.1
+t=0 0
+m=video ${videoPort} RTP/AVP ${videoPayloadType}
+a=rtpmap:${videoPayloadType} VP8/90000
+${videoSsrc ? `a=ssrc:${videoSsrc} cname:mediasoup-video` : ''}
+m=audio ${audioPort} RTP/AVP ${audioPayloadType}
+a=rtpmap:${audioPayloadType} opus/48000/2
+a=fmtp:${audioPayloadType} minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1
+${audioSsrc ? `a=ssrc:${audioSsrc} cname:mediasoup-audio` : ''}
+`.trim();
 
         await fs.writeFile(this.sdpPath, sdpContent);
 
@@ -109,10 +116,20 @@ export class Recorder {
         this.ffmpegProcess = spawn('ffmpeg', [
             '-loglevel', 'debug',
             '-protocol_whitelist', 'file,rtp,udp',
+            // Buffer and reorder settings for RTP streams
+            '-reorder_queue_size', '500',
+            '-max_delay', '500000',
             '-i', this.sdpPath,
-            '-c:v', 'copy', // Copy VP8 as is
-            '-c:a', 'aac',  // Convert opus to aac for mp4
+            // Video: copy VP8 as is (for WebM compatibility)
+            '-c:v', 'copy',
+            // Audio: decode Opus and encode to AAC with proper settings
+            '-c:a', 'aac',
+            '-ar', '48000',           // Sample rate matching Opus source
+            '-ac', '2',               // Stereo channels
+            '-b:a', '128k',           // Audio bitrate for good quality
+            '-af', 'aresample=async=1:first_pts=0', // Fix audio sync issues
             '-flags', '+global_header',
+            '-movflags', '+faststart', // Enable streaming-friendly output
             '-y',
             this.outputPath
         ]);
