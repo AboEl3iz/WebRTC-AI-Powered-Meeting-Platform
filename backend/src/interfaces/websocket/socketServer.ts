@@ -3,13 +3,15 @@ import { Server as HTTPServer } from 'http';
 import { RoomService } from "../../services/RoomService";
 import { SignalingHandler } from "./handlers/signalingHandler";
 import { MediasoupWorkerManager } from "../../media/MediasoupWorkerManager";
+
 export class WebSocketServer {
     private ws: WebSocket.Server;
-    private _roomService : RoomService;
-    private _mediasoupWorkerManager : MediasoupWorkerManager;
-    constructor(server: HTTPServer) {
+    private _roomService: RoomService;
+    private _mediasoupWorkerManager: MediasoupWorkerManager;
+
+    constructor(server: HTTPServer, roomService: RoomService) {
         this.ws = new WebSocket.Server({ server })
-        this._roomService = new RoomService();
+        this._roomService = roomService;
         this._mediasoupWorkerManager = new MediasoupWorkerManager();
         this._mediasoupWorkerManager.init();
     }
@@ -27,16 +29,16 @@ export class WebSocketServer {
             ws.on('close', () => {
                 console.log('Client disconnected');
                 _SignalingHandler.close();
-                });
-               
+            });
 
 
-            
+
+
         });
 
-        
 
-    
+
+
 
     }
 }

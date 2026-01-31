@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import { RoomService } from "../../../services/RoomService";
 import { MediasoupWorkerManager } from "../../../media/MediasoupWorkerManager";
 import { Recorder } from "./record";
+import { chatService, ChatMessageResponse } from "../../../services/ChatService";
 
 interface SignalingMessage<T = any> {
   event: string;
@@ -57,6 +58,15 @@ export class SignalingHandler {
 
       case "stop-recording":
         return this.handleStopRecording(data);
+
+      case "send-message":
+        return this.handleSendMessage(data);
+
+      case "get-chat-history":
+        return this.handleGetChatHistory(data);
+
+      case "get-participants":
+        return this.handleGetParticipants(data);
 
       default:
         return this.sendError("Unknown event");
@@ -236,15 +246,22 @@ export class SignalingHandler {
       }
     }));
 
-    // 2. Notify OTHERS
+    // 2. Notify OTHERS (FIX: Include user info to prevent audio display bug)
     const peers = this.roomservice.getUsersInRoom(roomId);
+    const peerInfo = this.roomservice.getPeerInfo(roomId, userId);
     peers.forEach(peerId => {
       if (peerId === userId) return;
       const peerSocket = this.roomservice.getUserSocket(peerId);
       if (peerSocket) {
         peerSocket.send(JSON.stringify({
           event: "new-producer",
-          data: { producerId: producer.id, kind }
+          data: {
+            producerId: producer.id,
+            kind,
+            userId,
+            producerName: peerInfo?.name || 'Unknown',
+            producerEmail: peerInfo?.email || ''
+          }
         }));
       }
     });
@@ -404,6 +421,111 @@ export class SignalingHandler {
         data: {}
       });
     }
+  }
+
+  /* ================= CHAT ================= */
+
+  private async handleSendMessage(data: any) {
+    // Use stored context as fallback if not provided in data
+    const roomId = data.roomId || this.currentRoomId;
+    const userId = data.userId || this.currentUserId;
+    // Accept multiple common property names for message content
+    const content = data.content || data.message || data.text;
+
+    console.log(`📨 Chat message request - Room: ${roomId}, User: ${userId}, Content: ${content?.substring(0, 50)}...`);
+    console.log(`📨 Raw data received:`, JSON.stringify(data));
+
+    if (!roomId || !userId) {
+      console.error("❌ Missing roomId or userId for chat message");
+      return this.sendError("You must be in a room to send messages");
+    }
+
+    if (!content || String(content).trim().length === 0) {
+      console.error("❌ Missing message content");
+      return this.sendError("Message content cannot be empty");
+    }
+
+    const peerInfo = this.roomservice.getPeerInfo(roomId, userId);
+    if (!peerInfo) {
+      console.error(`❌ User ${userId} not found in room ${roomId}`);
+      return this.sendError("User not found in room");
+    }
+
+    try {
+      // Save message to database
+      const message = await chatService.saveMessage({
+        roomId,
+        senderId: userId,
+        senderName: peerInfo.name,
+        senderEmail: peerInfo.email,
+        content: content.trim()
+      });
+
+      console.log(`✅ Message saved with ID: ${message.id}`);
+
+      // Broadcast to all participants
+      this.broadcastToRoom(roomId, {
+        event: 'new-message',
+        data: message
+      });
+
+      // Also send confirmation to sender
+      this.ws.send(JSON.stringify({
+        event: 'message-sent',
+        data: message
+      }));
+    } catch (error) {
+      console.error("❌ Failed to save chat message:", error);
+      this.sendError("Failed to send message");
+    }
+  }
+
+  private async handleGetChatHistory(data: any) {
+    const { roomId, limit, before } = data;
+
+    if (!roomId) {
+      return this.sendError("Room ID is required");
+    }
+
+    try {
+      const messages = await chatService.getChatHistory(
+        roomId,
+        limit || 50,
+        before ? new Date(String(before)) : undefined
+      );
+
+      this.ws.send(JSON.stringify({
+        event: 'chat-history',
+        data: {
+          roomId,
+          messages
+        }
+      }));
+    } catch (error) {
+      console.error("Failed to fetch chat history:", error);
+      this.sendError("Failed to fetch chat history");
+    }
+  }
+
+  /* ================= PARTICIPANTS ================= */
+
+  private handleGetParticipants(data: any) {
+    const { roomId } = data;
+
+    if (!roomId) {
+      return this.sendError("Room ID is required");
+    }
+
+    const participants = this.roomservice.getParticipantsDetails(roomId);
+
+    this.ws.send(JSON.stringify({
+      event: 'participants-list',
+      data: {
+        roomId,
+        count: participants.length,
+        participants
+      }
+    }));
   }
 
   private broadcastToRoom(roomId: string, message: SignalingMessage) {
