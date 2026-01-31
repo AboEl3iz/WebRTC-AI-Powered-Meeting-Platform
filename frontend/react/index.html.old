@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Meeting</title>
+  <style>
+    /* Restored exact original style */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+      background: #202124;
+      color: #e8eaed;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .header {
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #292a2d;
+      border-bottom: 1px solid #3c4043;
+    }
+
+    .room-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .room-code {
+      background: #3c4043;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .video-grid {
+      flex: 1;
+      display: grid;
+      gap: 8px;
+      padding: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-auto-rows: minmax(200px, 1fr);
+      align-content: start;
+      overflow-y: auto;
+    }
+
+    .video-container {
+      position: relative;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      aspect-ratio: 16/9;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .video-container.local {
+      border: 2px solid #1a73e8;
+    }
+
+    .video-container.pinned {
+      grid-column: span 2;
+      grid-row: span 2;
+      z-index: 5;
+    }
+
+    .video-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .video-label {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Mute indicator styling */
+    .mute-indicator {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .mute-icon {
+      background: rgba(234, 67, 53, 0.8);
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .mute-icon.hidden {
+      display: none;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 16px;
+      background: #292a2d;
+      padding: 12px 24px;
+      border-radius: 50px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+    }
+
+    .control-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: #3c4043;
+      color: #e8eaed;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      transition: all 0.2s;
+    }
+
+    .control-btn:hover {
+      background: #5f6368;
+    }
+
+    .control-btn.active {
+      background: #1a73e8;
+    }
+
+    .control-btn.danger {
+      background: #ea4335;
+    }
+
+    .join-screen {
+      position: fixed;
+      inset: 0;
+      background: #202124;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .join-screen.hidden {
+      display: none;
+    }
+
+    .join-box {
+      background: #292a2d;
+      padding: 40px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #9aa0a6;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #5f6368;
+      border-radius: 8px;
+      background: #3c4043;
+      color: #e8eaed;
+      font-size: 16px;
+    }
+
+    .logs {
+      position: fixed;
+      bottom: 100px;
+      right: 16px;
+      background: rgba(0, 0, 0, 0.95);
+      padding: 12px;
+      border-radius: 8px;
+      width: 400px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      z-index: 100;
+      border: 1px solid #3c4043;
+    }
+
+    .logs.hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="join-screen" id="joinScreen">
+    <div class="join-box">
+      <h1>Join Meeting</h1>
+      <div class="input-group"><label>Your Name</label><input type="text" id="userName" value="User"></div>
+      <div class="input-group"><label>Email</label><input type="email" id="userEmail" value="user@example.com"></div>
+      <div class="input-group"><label>Room Code</label><input type="text" id="roomId" value="test-room"></div>
+      <button id="joinBtn"
+        style="width:100%; padding:14px; background:#1a73e8; color:white; border:none; border-radius:8px; cursor:pointer;">Join
+        Now</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div class="room-info"><span>🎥</span><span class="room-code" id="roomCode">-</span></div>
+      <div id="status" class="status disconnected" style="padding: 8px 16px; border-radius: 8px; font-size: 14px;">
+        Disconnected</div>
+    </div>
+    <div class="main-content">
+      <div id="videoGrid" class="video-grid"></div>
+      <div class="controls">
+        <button class="control-btn active" id="micBtn" title="Microphone">🎤</button>
+        <button class="control-btn active" id="camBtn" title="Camera">📹</button>
+        <button class="control-btn" id="screenBtn" title="Share Screen">🖥️</button>
+        <button class="control-btn" id="recordBtn" title="Record Meeting">⏺️</button>
+        <button class="control-btn danger" id="leaveBtn" title="Leave">📞</button>
+      </div>
+    </div>
+  </div>
+  <div id="logs" class="logs hidden"></div>
+  <button id="debugToggle"
+    style="position:fixed; bottom:24px; right:16px; z-index:101; padding:8px 16px; border-radius:8px; border:none; background:#3c4043; color:white; cursor:pointer;">Logs
+    (L)</button>
+
+  <script type="module">
+    import * as mediasoupClient from 'https://cdn.skypack.dev/mediasoup-client@3.6.102';
+
+    let ws = null, device = null, sendTransport = null, recvTransport = null;
+    const producers = new Map();
+    const consumers = new Map(); // consumerId -> {consumer, producerId, domId}
+    const producerIdToConsumerId = new Map(); // producerId -> consumerId (for lookup)
+    const pendingProducers = [];
+    let localStream = null, screenStream = null;
+    const state = { roomId: null, userId: null, micEnabled: true, cameraEnabled: true, screenSharing: false, isReady: false };
+    let isRecording = false;
+
+    function log(msg, type = 'info') {
+      const logsDiv = document.getElementById('logs');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logsDiv.appendChild(entry);
+      logsDiv.scrollTop = logsDiv.scrollHeight;
+      console.log(msg); // Also log to console
+    }
+
+    function updateGridLayout() {
+      const grid = document.getElementById('videoGrid');
+      const containers = Array.from(grid.children);
+      const hasPinned = !!grid.querySelector('.pinned');
+
+      if (hasPinned && containers.length > 1) {
+        grid.style.gridTemplateColumns = '2fr 1fr';
+      } else {
+        grid.style.gridTemplateColumns = containers.length <= 1 ? '1fr' : (containers.length <= 2 ? '1fr 1fr' : 'repeat(auto-fit, minmax(300px, 1fr))');
+      }
+    }
+
+    async function handleWebSocketMessage(event) {
+      const message = JSON.parse(event.data);
+      log(`📨 Received: ${message.event}`, 'info');
+
+      switch (message.event) {
+        case 'router-rtp-capabilities':
+          device = new mediasoupClient.Device();
+          await device.load({ routerRtpCapabilities: message.data });
+          ws.send(JSON.stringify({ event: 'create-transport', data: { direction: 'send', userId: state.userId, roomId: state.roomId } }));
+          setTimeout(() => ws.send(JSON.stringify({ event: 'create-transport', data: { direction: 'recv', userId: state.userId, roomId: state.roomId } })), 200);
+          break;
+
+        case 'transport-created':
+          if (message.data.direction === 'send') {
+            sendTransport = device.createSendTransport(message.data.transport);
+            sendTransport.on('connect', ({ dtlsParameters }, cb) => ws.send(JSON.stringify({ event: 'connect-transport', data: { direction: 'send', dtlsParameters, userId: state.userId, roomId: state.roomId } })) || cb());
+            sendTransport.on('produce', async ({ kind, rtpParameters }, cb) => {
+              ws.send(JSON.stringify({ event: 'produce', data: { kind, rtpParameters, userId: state.userId, roomId: state.roomId } }));
+              const h = (e) => {
+                const m = JSON.parse(e.data);
+                if (m.event === 'produced' && m.data.kind === kind) { ws.removeEventListener('message', h); cb({ id: m.data.producerId }); }
+              };
+              ws.addEventListener('message', h);
+            });
+          } else {
+            recvTransport = device.createRecvTransport(message.data.transport);
+            recvTransport.on('connect', ({ dtlsParameters }, cb) => ws.send(JSON.stringify({ event: 'connect-transport', data: { direction: 'recv', dtlsParameters, userId: state.userId, roomId: state.roomId } })) || cb());
+            state.isReady = true;
+            startLocalMedia();
+            pendingProducers.forEach(p => consumeMedia(p.producerId, p.kind));
+          }
+          break;
+
+        case 'new-producer':
+          log(`🆕 New producer: ${message.data.producerId} (${message.data.kind})`, 'info');
+          if (recvTransport) consumeMedia(message.data.producerId, message.data.kind);
+          else pendingProducers.push(message.data);
+          break;
+
+        case 'consumer-created':
+          const consumer = await recvTransport.consume(message.data);
+          const domId = `remote-${message.data.producerId}`;
+
+          // Store consumer with metadata
+          consumers.set(consumer.id, {
+            consumer: consumer,
+            producerId: message.data.producerId,
+            domId: domId
+          });
+
+          // Create reverse lookup: producerId -> consumerId
+          producerIdToConsumerId.set(message.data.producerId, consumer.id);
+
+          addVideoElement(domId, new MediaStream([consumer.track]), false);
+          log(`✅ Consumer ${consumer.id} created for producer ${message.data.producerId} -> DOM: video-${domId}`, 'success');
+          break;
+
+        case 'producer-closed':
+          const producerId = message.data.producerId;
+          log(`🚫 Producer closed: ${producerId}`, 'warn');
+
+          // DEBUG: Show all current video elements
+          const allVideos = Array.from(document.querySelectorAll('.video-container')).map(el => el.id);
+          log(`📋 Current video elements: ${JSON.stringify(allVideos)}`, 'info');
+          log(`📋 Looking for consumer with producerId: ${producerId}`, 'info');
+          log(`📋 producerIdToConsumerId map has: ${JSON.stringify(Array.from(producerIdToConsumerId.entries()))}`, 'info');
+
+          // Find the consumer associated with this producer
+          const consumerId = producerIdToConsumerId.get(producerId);
+
+          if (consumerId) {
+            const consumerData = consumers.get(consumerId);
+
+            if (consumerData) {
+              // Close the consumer
+              consumerData.consumer.close();
+
+              // Remove DOM element
+              const videoElement = document.getElementById(`video-${consumerData.domId}`);
+              if (videoElement) {
+                // Stop all tracks
+                const video = videoElement.querySelector('video');
+                if (video && video.srcObject) {
+                  video.srcObject.getTracks().forEach(track => {
+                    track.stop();
+                    log(`🛑 Stopped track: ${track.kind}`, 'info');
+                  });
+                }
+
+                videoElement.remove();
+                log(`✅ Removed video-${consumerData.domId}`, 'success');
+              } else {
+                log(`❌ Could not find video-${consumerData.domId}`, 'error');
+              }
+
+              // Clean up maps
+              consumers.delete(consumerId);
+              producerIdToConsumerId.delete(producerId);
+            } else {
+              log(`❌ Consumer data not found for ${consumerId}`, 'error');
+            }
+          } else {
+            log(`❌ No consumer found for producer ${producerId}`, 'error');
+
+            // Fallback: try to remove by ID pattern
+            const allVideos = document.querySelectorAll('.video-container');
+            allVideos.forEach(vid => {
+              if (vid.id.includes(producerId)) {
+                log(`🔍 Found via fallback: ${vid.id}`, 'warn');
+                vid.remove();
+              }
+            });
+          }
+
+          updateGridLayout();
+          break;
+
+        case 'peer-left':
+          log(`👋 Peer left: ${message.data.userId}`, 'warn');
+          document.querySelectorAll(`[id*="${message.data.userId}"]`).forEach(el => el.remove());
+          updateGridLayout();
+          break;
+
+        case 'recording-started':
+          log(`⏺️ Recording started in room: ${message.data.roomId}`, 'success');
+          isRecording = true;
+          updateRecordButton();
+          break;
+
+        case 'recording-stopped':
+          log(`⏹️ Recording stopped in room: ${message.data.roomId}`, 'warn');
+          isRecording = false;
+          updateRecordButton();
+          break;
+      }
+    }
+
+    async function startLocalMedia() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        addVideoElement(state.userId, localStream, true);
+
+        const audioProducer = await sendTransport.produce({ track: localStream.getAudioTracks()[0] });
+        producers.set('audio', audioProducer);
+
+        const videoProducer = await sendTransport.produce({ track: localStream.getVideoTracks()[0] });
+        producers.set('video', videoProducer);
+
+        log('✅ Local media started', 'success');
+      } catch (e) {
+        log(`❌ Media error: ${e.message}`, 'error');
+      }
+    }
+
+    async function consumeMedia(producerId, kind) {
+      log(`🔄 Requesting to consume producer ${producerId} (${kind})`, 'info');
+      ws.send(JSON.stringify({
+        event: 'consume',
+        data: {
+          producerId,
+          rtpCapabilities: device.rtpCapabilities,
+          userId: state.userId,
+          roomId: state.roomId
+        }
+      }));
+    }
+
+    function addVideoElement(id, stream, isLocal) {
+      const videoId = `video-${id}`;
+      if (document.getElementById(videoId)) {
+        log(`⚠️ Video element ${videoId} already exists`, 'warn');
+        return;
+      }
+
+      const container = document.createElement('div');
+      container.id = videoId;
+
+      // FIX: Check if video tracks exist before accessing label
+      const videoTracks = stream.getVideoTracks();
+      const hasVideo = videoTracks.length > 0;
+      const isScreen = hasVideo && (id.includes('screen') || videoTracks[0].label.toLowerCase().includes('screen'));
+
+      container.className = `video-container ${isLocal ? 'local' : ''} ${isScreen ? 'screen-share' : ''}`;
+
+      container.onclick = () => {
+        const alreadyPinned = container.classList.contains('pinned');
+        document.querySelectorAll('.video-container').forEach(el => el.classList.remove('pinned'));
+        if (!alreadyPinned) container.classList.add('pinned');
+        updateGridLayout();
+      };
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = isLocal;
+
+      const label = document.createElement('div');
+      label.className = 'video-label';
+      label.textContent = isLocal ? '👤 You' : (isScreen ? '🖥️ Presentation' : '👥 Peer');
+
+      const muteContainer = document.createElement('div');
+      muteContainer.className = 'mute-indicator';
+      const micM = document.createElement('div');
+      micM.id = `mic-mute-${id}`;
+      micM.className = 'mute-icon hidden';
+      micM.textContent = '🔇';
+      const camM = document.createElement('div');
+      camM.id = `cam-mute-${id}`;
+      camM.className = 'mute-icon hidden';
+      camM.textContent = '📷';
+      muteContainer.append(micM, camM);
+
+      container.append(video, label, muteContainer);
+      document.getElementById('videoGrid').appendChild(container);
+      updateGridLayout();
+
+      log(`📺 Added: ${videoId} (local:${isLocal}, screen:${isScreen})`, 'info');
+    }
+
+    document.getElementById('joinBtn').onclick = () => {
+      state.roomId = document.getElementById('roomId').value;
+      const name = document.getElementById('userName').value;
+      const email = document.getElementById('userEmail').value;
+      state.userId = name + '-' + Date.now();
+      document.getElementById('roomCode').textContent = state.roomId;
+
+      ws = new WebSocket('ws://localhost:8000');
+      ws.onopen = () => {
+        log('🔌 WebSocket connected', 'success');
+        const name = document.getElementById('userName').value;
+        const email = document.getElementById('userEmail').value;
+        ws.send(JSON.stringify({
+          event: 'join_room',
+          data: {
+            roomId: state.roomId,
+            userId: state.userId,
+            name: name,
+            email: email
+          }
+        }));
+      };
+      ws.onmessage = handleWebSocketMessage;
+      ws.onerror = (err) => log(`❌ WebSocket error: ${err}`, 'error');
+      ws.onclose = () => log('🔌 WebSocket disconnected', 'warn');
+
+      document.getElementById('joinScreen').classList.add('hidden');
+      document.getElementById('status').textContent = 'Connected';
+      document.getElementById('status').style.color = '#34a853';
+    };
+
+    document.getElementById('micBtn').onclick = () => {
+      const p = producers.get('audio');
+      if (p) {
+        state.micEnabled ? p.pause() : p.resume();
+        state.micEnabled = !state.micEnabled;
+        document.getElementById('micBtn').textContent = state.micEnabled ? '🎤' : '🔇';
+        document.getElementById('micBtn').classList.toggle('danger', !state.micEnabled);
+        document.getElementById(`mic-mute-${state.userId}`).classList.toggle('hidden', state.micEnabled);
+      }
+    };
+
+    document.getElementById('camBtn').onclick = () => {
+      const p = producers.get('video');
+      if (p) {
+        state.cameraEnabled ? p.pause() : p.resume();
+        state.cameraEnabled = !state.cameraEnabled;
+        document.getElementById('camBtn').textContent = state.cameraEnabled ? '📹' : '📷';
+        document.getElementById('camBtn').classList.toggle('danger', !state.cameraEnabled);
+        document.getElementById(`cam-mute-${state.userId}`).classList.toggle('hidden', state.cameraEnabled);
+      }
+    };
+
+    document.getElementById('screenBtn').onclick = async () => {
+      if (!state.screenSharing) {
+        try {
+          log('🖥️ Starting screen share...', 'info');
+          screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          const track = screenStream.getVideoTracks()[0];
+
+          const producer = await sendTransport.produce({ track, appData: { source: 'screen' } });
+          producers.set('screen', producer);
+
+          const screenDomId = `${state.userId}-screen`;
+          addVideoElement(screenDomId, screenStream, true);
+
+          state.screenSharing = true;
+          document.getElementById('screenBtn').classList.add('active');
+
+          track.onended = () => {
+            log('🖥️ Screen share ended by user', 'info');
+            stopLocalScreenShare();
+          };
+
+          log(`✅ Screen share started (producer: ${producer.id})`, 'success');
+        } catch (e) {
+          log(`❌ Screen share error: ${e.message}`, 'error');
+        }
+      } else {
+        stopLocalScreenShare();
+      }
+    };
+
+    function stopLocalScreenShare() {
+      log('🛑 stopLocalScreenShare called', 'info');
+
+      const p = producers.get('screen');
+      log(`🔍 Screen producer in map: ${p ? p.id : 'NOT FOUND'}`, 'info');
+
+      if (p) {
+        log(`🛑 Requesting server to close screen producer ${p.id}`, 'info');
+
+        // Check if ws is connected
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          log(`❌ WebSocket not connected! State: ${ws ? ws.readyState : 'null'}`, 'error');
+        } else {
+          // FIX: Tell server to close producer FIRST
+          try {
+            const message = {
+              event: 'close-producer',
+              data: {
+                producerId: p.id,
+                userId: state.userId,
+                roomId: state.roomId
+              }
+            };
+            log(`📤 Sending close-producer: ${JSON.stringify(message)}`, 'info');
+            ws.send(JSON.stringify(message));
+            log(`✅ close-producer message sent`, 'success');
+          } catch (err) {
+            log(`❌ Error sending close-producer: ${err.message}`, 'error');
+          }
+        }
+
+        // Then close locally
+        p.close();
+        producers.delete('screen');
+        log(`✅ Local producer closed and removed from map`, 'info');
+      } else {
+        log(`⚠️ No screen producer found to close`, 'warn');
+      }
+
+      if (screenStream) {
+        screenStream.getTracks().forEach(t => {
+          t.stop();
+          log(`🛑 Stopped screen track`, 'info');
+        });
+        screenStream = null;
+      }
+
+      const screenElement = document.getElementById(`video-${state.userId}-screen`);
+      if (screenElement) {
+        screenElement.remove();
+        log('✅ Removed local screen element', 'success');
+      }
+
+      state.screenSharing = false;
+      document.getElementById('screenBtn').classList.remove('active');
+      updateGridLayout();
+    }
+
+    document.getElementById('recordBtn').onclick = async () => {
+      if (!isRecording) {
+        const videoProducer = producers.get('video');
+        const audioProducer = producers.get('audio');
+
+        if (!videoProducer || !audioProducer) {
+          log('❌ Need both video and audio producers (Mic & Camera) to start recording', 'error');
+          return;
+        }
+
+        ws.send(JSON.stringify({
+          event: 'start-recording',
+          data: {
+            roomId: state.roomId,
+            userId: state.userId,
+            videoProducerId: videoProducer.id,
+            audioProducerId: audioProducer.id
+          }
+        }));
+        log('⏺️ Requesting to start recording...', 'info');
+      } else {
+        ws.send(JSON.stringify({
+          event: 'stop-recording',
+          data: { roomId: state.roomId }
+        }));
+        log('⏹️ Requesting to stop recording...', 'info');
+      }
+    };
+
+    function updateRecordButton() {
+      const btn = document.getElementById('recordBtn');
+      if (isRecording) {
+        btn.textContent = '⏹️';
+        btn.classList.add('danger');
+        btn.title = 'Stop Recording';
+      } else {
+        btn.textContent = '⏺️';
+        btn.classList.remove('danger');
+        btn.title = 'Start Recording';
+      }
+    }
+
+    document.getElementById('leaveBtn').onclick = () => location.reload();
+    document.getElementById('debugToggle').onclick = () => document.getElementById('logs').classList.toggle('hidden');
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'l' || e.key === 'L') {
+        document.getElementById('logs').classList.toggle('hidden');
+      }
+    });
+  </script>
+</body>
+
+</html>

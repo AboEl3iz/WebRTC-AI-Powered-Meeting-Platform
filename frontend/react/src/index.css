@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+}
+
+body {
+    @apply bg-white text-gray-900 font-sans overflow-hidden antialiased;
+}
+
+.video-grid {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    height: 100%;
+    width: 100%;
+    transition: all 0.5s ease-in-out;
+}
+
+.glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-gray-200/50 shadow-lg;
+}
+
+.control-btn {
+    @apply flex items-center justify-center w-12 h-12 rounded-full transition-all duration-200 hover:scale-105 active:scale-95;
+}
+
+.control-btn-active {
+    @apply bg-blue-600 text-white shadow-md shadow-blue-200;
+}
+
+.control-btn-inactive {
+    @apply bg-gray-100 text-gray-500;
+}
+
+.control-btn-danger {
+    @apply bg-red-500 text-white shadow-md shadow-red-200 hover:bg-red-600;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes zoom-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes slide-in-bottom {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.animate-in {
+    animation-duration: 500ms;
+    animation-fill-mode: both;
+}
+
+.fade-in {
+    animation-name: fade-in;
+}
+
+.zoom-in {
+    animation-name: zoom-in;
+}
+
+.slide-in-from-bottom-10 {
+    animation-name: slide-in-bottom;
+}
