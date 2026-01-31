@@ -3,6 +3,7 @@ import http from 'http';
 import { CustomConfig } from "./config/config";
 import express, { Application } from "express";
 import mongoose from 'mongoose';
+import logger from './config/logger';
 
 async function Bootstrap() {
     const _express: Application = express();
@@ -16,13 +17,13 @@ async function Bootstrap() {
 
     try {
         await mongoose.connect(mongoUri);
-        console.log("Connected to MongoDB");
+        logger.database.info("Connected to MongoDB");
     } catch (error) {
-        console.error("MongoDB connection error:", error);
+        logger.database.error("MongoDB connection error", { error: String(error) });
     }
 
     server.listen(config.port, () => {
-        console.log(`Server is running on port ${config.port}`);
+        logger.info(`Server is running on port ${config.port}`);
     });
 }
 

@@ -3,6 +3,7 @@ import { RoomService } from "../../../services/RoomService";
 import { MediasoupWorkerManager } from "../../../media/MediasoupWorkerManager";
 import { Recorder } from "./record";
 import { chatService, ChatMessageResponse } from "../../../services/ChatService";
+import logger from "../../../config/logger";
 
 interface SignalingMessage<T = any> {
   event: string;
@@ -76,11 +77,14 @@ export class SignalingHandler {
   public async close(): Promise<void> {
 
     if (!this.currentRoomId || !this.currentUserId) {
-      console.error("Could not close: User was not fully joined.");
+      logger.signaling.warn("Could not close: User was not fully joined");
       return;
     }
 
-    console.log(`Cleaning up for ${this.currentUserId} in ${this.currentRoomId}`);
+    logger.signaling.info("Cleaning up user session", {
+      userId: this.currentUserId,
+      roomId: this.currentRoomId
+    });
 
     // 1. Remove user (this closes producers on the server)
     this.roomservice.removeUserFromRoom(this.currentRoomId, this.currentUserId);
@@ -135,12 +139,12 @@ export class SignalingHandler {
       data: { roomId }
     }));
 
-    console.log(`👤 ${userId} joined room ${roomId}`);
+    logger.signaling.info("User joined room", { userId, roomId, name });
   }
 
   private handleLeaveRoom({ roomId, userId }: any) {
     this.roomservice.removeUserFromRoom(roomId, userId);
-    console.log(`👋 ${userId} left room ${roomId}`);
+    logger.signaling.info("User left room", { userId, roomId });
   }
 
   /* ================= TRANSPORT ================= */
@@ -190,25 +194,25 @@ export class SignalingHandler {
     const producer = await transport.produce({ kind, rtpParameters });
     this.roomservice.addProducer(roomId, userId, producer);
 
-    console.log(`📹 Producer created: ${producer.id} (kind: ${kind}) by user: ${userId}`);
+    logger.media.info("Producer created", { producerId: producer.id, kind, userId });
 
     // FIX: Add transportclose handler
     producer.on('transportclose', () => {
-      console.log(`🚚 Transport closed for producer ${producer.id}`);
+      logger.media.debug("Transport closed for producer", { producerId: producer.id });
       producer.close();
     });
 
 
     const broadcastClose = () => {
-      console.log(`❌ Producer ${producer.id} closed (kind: ${kind}, user: ${userId})`);
+      logger.media.info("Producer closed", { producerId: producer.id, kind, userId });
 
       const peers = this.roomservice.getUsersInRoom(roomId);
-      console.log(`📢 Broadcasting producer-closed to ${peers.length} peers`);
+      logger.media.debug("Broadcasting producer-closed", { peerCount: peers.length });
 
       let notifiedCount = 0;
       peers.forEach(peerId => {
         if (peerId === userId) {
-          console.log(`  ⏭️  Skipping self: ${peerId}`);
+          logger.media.debug("Skipping self notification", { peerId });
           return;
         }
 
@@ -223,13 +227,13 @@ export class SignalingHandler {
             }
           }));
           notifiedCount++;
-          console.log(`  ✅ Notified peer: ${peerId}`);
+          logger.media.debug("Notified peer about producer closure", { peerId });
         } else {
-          console.log(`  ❌ Could not notify peer: ${peerId} (socket not ready)`);
+          logger.media.warn("Could not notify peer - socket not ready", { peerId });
         }
       });
 
-      console.log(`📢 Notified ${notifiedCount} peers about producer ${producer.id} closure`);
+      logger.media.debug("Producer closure notification complete", { notifiedCount, producerId: producer.id });
     };
 
     // Listen to both possible event names
@@ -307,44 +311,41 @@ export class SignalingHandler {
   /* ================= CLOSE PRODUCER ================= */
 
   private async handleCloseProducer({ roomId, userId, producerId }: any) {
-    console.log(`🛑 Received close-producer request`);
-    console.log(`   roomId: ${roomId}`);
-    console.log(`   userId: ${userId}`);
-    console.log(`   producerId: ${producerId}`);
+    logger.media.info("Close producer request received", { roomId, userId, producerId });
 
     const producer = this.roomservice.getProducer(producerId);
 
     if (!producer) {
-      console.log(`❌ Producer ${producerId} not found in room service`);
+      logger.media.warn("Producer not found in room service", { producerId });
       return this.sendError("Producer not found");
     }
 
-    console.log(`✅ Found producer: ${producer.id}, kind: ${producer.kind}`);
+    logger.media.debug("Found producer", { producerId: producer.id, kind: producer.kind });
 
     // Close the producer on the server
     producer.close();
-    console.log(`✅ Producer ${producerId} closed on server`);
+    logger.media.info("Producer closed on server", { producerId });
 
     // Manually broadcast to other peers (since close event might not fire)
     const peers = this.roomservice.getUsersInRoom(roomId);
-    console.log(`📢 Room has ${peers.length} total peers: ${JSON.stringify(peers)}`);
+    logger.media.debug("Room peers for notification", { peerCount: peers.length, peers });
 
     let notifiedCount = 0;
     peers.forEach(peerId => {
       if (peerId === userId) {
-        console.log(`  ⏭️  Skipping self: ${peerId}`);
+        logger.media.debug("Skipping self", { peerId });
         return;
       }
 
-      console.log(`  🔍 Trying to notify peer: ${peerId}`);
+      logger.media.debug("Attempting to notify peer", { peerId });
       const peerSocket = this.roomservice.getUserSocket(peerId);
 
       if (!peerSocket) {
-        console.log(`    ❌ No socket found for peer: ${peerId}`);
+        logger.media.warn("No socket found for peer", { peerId });
         return;
       }
 
-      console.log(`    Socket state: ${peerSocket.readyState} (OPEN=${WebSocket.OPEN})`);
+      logger.media.debug("Socket state check", { peerId, state: peerSocket.readyState, openState: WebSocket.OPEN });
 
       if (peerSocket.readyState === WebSocket.OPEN) {
         const message = JSON.stringify({
@@ -355,16 +356,16 @@ export class SignalingHandler {
             kind: producer.kind
           }
         });
-        console.log(`    📤 Sending: ${message}`);
+        logger.media.debug("Sending producer-closed message", { peerId });
         peerSocket.send(message);
         notifiedCount++;
-        console.log(`    ✅ Successfully sent to peer: ${peerId}`);
+        logger.media.debug("Successfully sent to peer", { peerId });
       } else {
-        console.log(`    ❌ Socket not open for peer: ${peerId}`);
+        logger.media.warn("Socket not open for peer", { peerId });
       }
     });
 
-    console.log(`📢 Total notified: ${notifiedCount} peers about producer ${producerId} closure`);
+    logger.media.info("Producer closure notification complete", { notifiedCount, producerId });
   }
 
   /**=======================Recorder Management=========== */
@@ -402,8 +403,10 @@ export class SignalingHandler {
         event: 'recording-started',
         data: { startedBy: userId }
       });
+
+      logger.recording.info("Recording started", { roomId, startedBy: userId });
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.recording.error("Failed to start recording", { roomId, error: String(error) });
       this.sendError("Server failed to start the recording process.");
     }
   }
@@ -420,6 +423,8 @@ export class SignalingHandler {
         event: 'recording-stopped',
         data: {}
       });
+
+      logger.recording.info("Recording stopped", { roomId });
     }
   }
 
@@ -432,22 +437,22 @@ export class SignalingHandler {
     // Accept multiple common property names for message content
     const content = data.content || data.message || data.text;
 
-    console.log(`📨 Chat message request - Room: ${roomId}, User: ${userId}, Content: ${content?.substring(0, 50)}...`);
-    console.log(`📨 Raw data received:`, JSON.stringify(data));
+    logger.signaling.debug("Chat message request", { roomId, userId, contentPreview: content?.substring(0, 50) });
+    logger.signaling.debug("Raw chat data received", { data });
 
     if (!roomId || !userId) {
-      console.error("❌ Missing roomId or userId for chat message");
+      logger.signaling.warn("Missing roomId or userId for chat message");
       return this.sendError("You must be in a room to send messages");
     }
 
     if (!content || String(content).trim().length === 0) {
-      console.error("❌ Missing message content");
+      logger.signaling.warn("Missing message content");
       return this.sendError("Message content cannot be empty");
     }
 
     const peerInfo = this.roomservice.getPeerInfo(roomId, userId);
     if (!peerInfo) {
-      console.error(`❌ User ${userId} not found in room ${roomId}`);
+      logger.signaling.warn("User not found in room", { userId, roomId });
       return this.sendError("User not found in room");
     }
 
@@ -461,7 +466,7 @@ export class SignalingHandler {
         content: content.trim()
       });
 
-      console.log(`✅ Message saved with ID: ${message.id}`);
+      logger.signaling.info("Message saved", { messageId: message.id, roomId });
 
       // Broadcast to all participants
       this.broadcastToRoom(roomId, {
@@ -475,7 +480,7 @@ export class SignalingHandler {
         data: message
       }));
     } catch (error) {
-      console.error("❌ Failed to save chat message:", error);
+      logger.signaling.error("Failed to save chat message", { error: String(error) });
       this.sendError("Failed to send message");
     }
   }
@@ -502,7 +507,7 @@ export class SignalingHandler {
         }
       }));
     } catch (error) {
-      console.error("Failed to fetch chat history:", error);
+      logger.signaling.error("Failed to fetch chat history", { roomId, error: String(error) });
       this.sendError("Failed to fetch chat history");
     }
   }

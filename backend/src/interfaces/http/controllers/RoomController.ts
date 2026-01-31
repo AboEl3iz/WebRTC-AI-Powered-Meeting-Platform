@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { RoomService } from '../../../services/RoomService';
 import { chatService } from '../../../services/ChatService';
+import logger from '../../../config/logger';
 
 /**
  * RoomController
@@ -51,7 +52,7 @@ export class RoomController {
                 }
             });
         } catch (error) {
-            console.error('Error fetching participants:', error);
+            logger.http.error("Error fetching participants", { error: String(error) });
             res.status(500).json({
                 success: false,
                 error: 'Failed to fetch participants'
@@ -88,7 +89,7 @@ export class RoomController {
                 }
             });
         } catch (error) {
-            console.error('Error fetching chat history:', error);
+            logger.http.error("Error fetching chat history", { error: String(error) });
             res.status(500).json({
                 success: false,
                 error: 'Failed to fetch chat history'
