@@ -76,7 +76,7 @@ class TranscriptionBackend(ABC):
 class WhisperXBackend(TranscriptionBackend):
     """WhisperX-based transcription (original implementation)."""
     
-    def __init__(self, device: str = None, compute_type: str = "int8", model_size: str = "base", language: str = "ar"):
+    def __init__(self, device: str = None, compute_type: str = "int8", model_size: str = "base", language: str = "en"):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.compute_type = compute_type
         self.model_size = model_size
@@ -170,25 +170,78 @@ class FasterWhisperBackend(TranscriptionBackend):
 
 
 # ============================================================================
+# COLAB WHISPER BACKEND (Remote API)
+# ============================================================================
+class ColabWhisperBackend(TranscriptionBackend):
+    """
+    Colab-hosted Whisper backend that sends audio to a remote endpoint.
+    Uses the nabbra/whisper-medium-egyptian-arabic model running on Colab.
+    """
+    
+    DEFAULT_URL = "https://premises-attacks-detection-alexander.trycloudflare.com/transcribe"
+    
+    def __init__(self):
+        self.endpoint_url = os.getenv("COLAB_TRANSCRIBE_URL", self.DEFAULT_URL)
+        logger.info(f"ColabWhisperBackend initialized with endpoint: {self.endpoint_url}")
+    
+    def load_model(self):
+        """No-op for remote backend - model is already loaded on Colab."""
+        pass
+    
+    def transcribe(self, audio_path: str, batch_size: int = 16) -> dict:
+        import httpx
+        
+        if not os.path.exists(audio_path):
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+        
+        logger.info(f"🔥 Sending audio to Colab endpoint: {self.endpoint_url}")
+        
+        with open(audio_path, "rb") as f:
+            files = {"file": (os.path.basename(audio_path), f, "audio/wav")}
+            
+            # Use a longer timeout for large audio files
+            with httpx.Client(timeout=300.0) as client:
+                response = client.post(self.endpoint_url, files=files)
+                response.raise_for_status()
+        
+        result = response.json()
+        text = result.get("text", "")
+        
+        # Convert to whisperx-compatible format
+        output = {
+            "segments": [{"start": 0, "end": 0, "text": text}],
+            "text": text,
+            "language": "ar"
+        }
+        
+        logger.info("✅ Colab Transcription Completed.")
+        return output
+
+
+# ============================================================================
 # WHISPER SERVICE (FACTORY)
 # ============================================================================
 class WhisperService:
     """
     Main transcription service that delegates to the configured backend.
     Backend is selected via TRANSCRIPTION_BACKEND env var.
+    Default is 'colab' for remote Colab-hosted model.
     """
     
     def __init__(self, device: str = None, compute_type: str = "int8"):
-        backend_type = os.getenv("TRANSCRIPTION_BACKEND", "whisperx").lower()
+        backend_type = os.getenv("TRANSCRIPTION_BACKEND", "WhisperXBackend").lower()
         
-        if backend_type == "faster-whisper":
+        if backend_type == "colab":
+            logger.info("📌 Using Colab Whisper backend (Egyptian Arabic)")
+            self.backend = ColabWhisperBackend()
+        elif backend_type == "faster-whisper":
             logger.info("📌 Using Faster-Whisper backend (Egyptian Arabic)")
             self.backend = FasterWhisperBackend(device=device, compute_type=compute_type)
         else:
             logger.info("📌 Using WhisperX backend")
             self.backend = WhisperXBackend(device=device, compute_type=compute_type)
 
-    def load_model(self, model_size: str = "base", language: str = "ar"):
+    def load_model(self, model_size: str = "base", language: str = "en"):
         """Load model (for compatibility with existing code)."""
         if hasattr(self.backend, 'model_size'):
             self.backend.model_size = model_size

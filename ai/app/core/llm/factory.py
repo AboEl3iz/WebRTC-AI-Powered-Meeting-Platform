@@ -13,7 +13,7 @@ class LLMProvider(str, Enum):
 class LLMFactory:
     @staticmethod
     def get_llm(provider: str = None, **kwargs) -> BaseLLM:
-        provider = provider or os.getenv("LLM_PROVIDER", "openai")
+        provider = provider or os.getenv("LLM_PROVIDER", "ollama")
         
         if provider == LLMProvider.OPENAI:
             return OpenAILLM(**kwargs)

@@ -95,7 +95,7 @@ dist
 # vuepress v2.x temp and cache directory
 .temp
 .cache
-
+flow*
 # Sveltekit cache directory
 .svelte-kit/
 flow.md
