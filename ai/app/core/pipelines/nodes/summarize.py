@@ -12,15 +12,26 @@ async def summarize_node(state: PipelineState) -> PipelineState:
     if state.get("error"):
         return state
 
-    try:
-        text = state["transcript_text"]
-        if not text:
-            return {**state, "summary": "No text to summarize."}
+    text = state.get("transcript_text")
+    if not text:
+        return {**state, "summary": "No text to summarize."}
 
-        llm = LLMFactory.get_llm()
-        summarizer = Summarizer(llm)
-        
-        summary = await summarizer.summarize(text)
-        return {**state, "summary": summary}
-    except Exception as e:
-        return {**state, "error": f"Summarization Failed: {str(e)}"}
+    # Try primary LLM (OpenAI/Google), fallback to Ollama
+    providers_to_try = ["ollama"]
+    
+    for provider in providers_to_try:
+        try:
+            logger.info(f"Attempting summarization with {provider}...")
+            llm = LLMFactory.get_llm(provider=provider)
+            summarizer = Summarizer(llm)
+            
+            summary = await summarizer.summarize(text)
+            logger.info(f"Summarization succeeded with {provider}.")
+            return {**state, "summary": summary}
+        except Exception as e:
+            logger.warning(f"Summarization with {provider} failed: {e}")
+            continue
+    
+    # If all providers fail, log error but don't block pipeline
+    logger.error("All summarization providers failed.")
+    return {**state, "summary": "Summarization failed - all providers unavailable."}
