@@ -30,7 +30,9 @@ class Summarizer:
         default_instruction = (
             "Summarize the following meeting transcript. "
             "Focus on key decisions, action items, and important discussions. "
-            "Keep it concise and structured."
+            "Keep it concise and structured.",
+            "summarize the following text in 5 sentences"
+            
         )
         prompt = f"{instruction or default_instruction}\n\nTranscript:\n{text}"
         return await self.llm.agenerate(prompt)
