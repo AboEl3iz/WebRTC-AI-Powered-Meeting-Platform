@@ -77,6 +77,44 @@ export class RoomService {
         return { name: peer.name, email: peer.email };
     }
 
+    /**
+     * Get detailed information about all participants in a room
+     * Used by the REST API endpoint
+     */
+    public getParticipantsDetails(roomId: string): Array<{
+        userId: string;
+        name: string;
+        email: string;
+        hasVideo: boolean;
+        hasAudio: boolean;
+    }> {
+        const room = this.rooms.get(roomId);
+        if (!room) return [];
+
+        const participants: Array<{
+            userId: string;
+            name: string;
+            email: string;
+            hasVideo: boolean;
+            hasAudio: boolean;
+        }> = [];
+
+        room.forEach((peer, oderId) => {
+            const hasVideo = Array.from(peer.producers.values()).some(p => p.kind === 'video');
+            const hasAudio = Array.from(peer.producers.values()).some(p => p.kind === 'audio');
+
+            participants.push({
+                userId: oderId,
+                name: peer.name,
+                email: peer.email,
+                hasVideo,
+                hasAudio
+            });
+        });
+
+        return participants;
+    }
+
     /* ================= MEDIA ROOM ================= */
 
     public getMediaRoom(roomId: string) {

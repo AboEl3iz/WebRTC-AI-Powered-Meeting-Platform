@@ -1,6 +1,7 @@
 import * as mediasoup from "mediasoup";
 import { types } from "mediasoup";
 import { TransportWrapper } from "./TransportWrapper";
+import logger from "../config/logger";
 
 export class MediaRoomWrapper {
     private router!: types.Router;
@@ -38,7 +39,7 @@ export class MediaRoomWrapper {
             mediaCodecs: this.mediaCodecs,
         });
 
-        console.log(`🎥 Router created for room ${this.roomId}`);
+        logger.media.info("Router created for room", { roomId: this.roomId });
     }
 
 
@@ -69,9 +70,7 @@ export class MediaRoomWrapper {
         const transportwrapper = new TransportWrapper(transport);
         const key = `${userId}-${direction}`;
         this.transports.set(key, transportwrapper);
-        console.log(
-            `🚚 Transport created for peer=${userId}, direction=${direction}`
-        );
+        logger.media.debug("Transport created", { userId, direction });
         return transportwrapper;
     }
 
@@ -82,7 +81,4 @@ export class MediaRoomWrapper {
     close() {
         this.router.close();
     }
-
-
-
 }

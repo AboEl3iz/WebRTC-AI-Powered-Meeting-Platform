@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import net from 'net';
 import Meeting from '../../../models/Meeting';
+import logger from '../../../config/logger';
 
 async function getFreePort(): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -134,10 +135,12 @@ ${audioSsrc ? `a=ssrc:${audioSsrc} cname:mediasoup-audio` : ''}
             this.outputPath
         ]);
 
-        this.ffmpegProcess.stderr?.on('data', (data) => console.log(`FFmpeg [${this.roomId}]: ${data}`));
+        this.ffmpegProcess.stderr?.on('data', (data) => {
+            logger.recording.debug("FFmpeg output", { roomId: this.roomId, output: data.toString().substring(0, 200) });
+        });
 
         this.ffmpegProcess.on('close', async (code) => {
-            console.log(`FFmpeg process for room ${this.roomId} closed with code ${code}`);
+            logger.recording.info("FFmpeg process closed", { roomId: this.roomId, exitCode: code });
 
             // Update DB status
             if (this.meetingId) {
@@ -167,7 +170,7 @@ ${audioSsrc ? `a=ssrc:${audioSsrc} cname:mediasoup-audio` : ''}
             this.ffmpegProcess.kill('SIGINT');
 
             this.ffmpegProcess.on('exit', () => {
-                console.log('💾 FFmpeg successfully finished writing the file.');
+                logger.recording.info("FFmpeg successfully finished writing the file", { roomId: this.roomId });
                 if (fs.existsSync(this.sdpPath)) {
                     fs.removeSync(this.sdpPath); // Clean up the SDP
                 }
