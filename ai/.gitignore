@@ -20,17 +20,17 @@ site_build
 .venv
 docs.zip
 archive.zip
-
+mcp_*
 # vim temporary files
 *~
 .*.sw?
 .cache
-
+test_mcp_flow*
 # macOS
 .DS_Store
 .env
 .codspeed
-
+planner*
 input
 output
 .guide.md
