@@ -20,7 +20,10 @@ site_build
 .venv
 docs.zip
 archive.zip
-
+mcp_*
+plannerd.py
+planner*
+test_*
 # vim temporary files
 *~
 .*.sw?
