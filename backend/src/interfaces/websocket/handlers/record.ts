@@ -95,19 +95,19 @@ export class Recorder {
         const audioSsrc = this.audioConsumer.rtpParameters.encodings?.[0]?.ssrc;
 
         const sdpContent = `
-v=0
-o=- 0 0 IN IP4 127.0.0.1
-s=Mediasoup Recording
-c=IN IP4 127.0.0.1
-t=0 0
-m=video ${videoPort} RTP/AVP ${videoPayloadType}
-a=rtpmap:${videoPayloadType} VP8/90000
-${videoSsrc ? `a=ssrc:${videoSsrc} cname:mediasoup-video` : ''}
-m=audio ${audioPort} RTP/AVP ${audioPayloadType}
-a=rtpmap:${audioPayloadType} opus/48000/2
-a=fmtp:${audioPayloadType} minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1
-${audioSsrc ? `a=ssrc:${audioSsrc} cname:mediasoup-audio` : ''}
-`.trim();
+            v=0
+            o=- 0 0 IN IP4 127.0.0.1
+            s=Mediasoup Recording
+            c=IN IP4 127.0.0.1
+            t=0 0
+            m=video ${videoPort} RTP/AVP ${videoPayloadType}
+            a=rtpmap:${videoPayloadType} VP8/90000
+            ${videoSsrc ? `a=ssrc:${videoSsrc} cname:mediasoup-video` : ''}
+            m=audio ${audioPort} RTP/AVP ${audioPayloadType}
+            a=rtpmap:${audioPayloadType} opus/48000/2
+            a=fmtp:${audioPayloadType} minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1
+            ${audioSsrc ? `a=ssrc:${audioSsrc} cname:mediasoup-audio` : ''}
+            `.trim();
 
         await fs.writeFile(this.sdpPath, sdpContent);
 
