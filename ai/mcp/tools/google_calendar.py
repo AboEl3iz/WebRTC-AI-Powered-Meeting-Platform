@@ -6,7 +6,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from ..models import GoogleCalendarIntegration, Event
-
+import os
 logger = logging.getLogger(__name__)
 
 
@@ -15,18 +15,21 @@ class GoogleCalendarTool:
     
     def __init__(self, integration: GoogleCalendarIntegration):
         self.integration = integration
+        self.client_id = os.getenv("GOOGLE_CLIENT_ID")
+        self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         self.service = self._build_service()
 
     def _build_service(self):
         """Build the Google Calendar API service with the provided credentials."""
+
         credentials = Credentials(
             token=self.integration.access_token,
             refresh_token=self.integration.refresh_token,
             # These are needed for token refresh but we may not have them
             # In production, you'd store these or use a service account
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=None,
-            client_secret=None,
+            client_id=self.client_id,
+            client_secret=self.client_secret,
         )
         
         return build('calendar', 'v3', credentials=credentials)
