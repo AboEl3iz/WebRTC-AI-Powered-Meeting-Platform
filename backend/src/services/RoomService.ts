@@ -197,6 +197,46 @@ export class RoomService {
         return producers;
     }
 
+    /**
+     * Get all producers in a room organized by user
+     * Used for composite recording
+     * @returns Array of {userId, name, producers: {video, audio}}
+     */
+    public getProducersByUser(roomId: string): Array<{
+        userId: string;
+        name: string;
+        email: string;
+        video: Producer | undefined;
+        audio: Producer | undefined;
+    }> {
+        const room = this.rooms.get(roomId);
+        if (!room) return [];
+
+        const result: Array<{
+            userId: string;
+            name: string;
+            email: string;
+            video: Producer | undefined;
+            audio: Producer | undefined;
+        }> = [];
+
+        room.forEach((peer, userId) => {
+            const videoProducer = Array.from(peer.producers.values()).find(p => p.kind === 'video');
+            const audioProducer = Array.from(peer.producers.values()).find(p => p.kind === 'audio');
+
+            result.push({
+                userId,
+                name: peer.name,
+                email: peer.email,
+                video: videoProducer,
+                audio: audioProducer
+            });
+        });
+
+        return result;
+    }
+
+
     /* ================= CONSUMER ================= */
 
     public addConsumer(

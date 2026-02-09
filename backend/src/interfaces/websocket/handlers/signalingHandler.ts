@@ -370,7 +370,7 @@ export class SignalingHandler {
 
   /**=======================Recorder Management=========== */
   private async handleStartRecording(data: any) {
-    const { roomId, userId, videoProducerId, audioProducerId } = data;
+    const { roomId, userId } = data;
 
     // 1. Check if recording is already active
     if (this.recorders.has(roomId)) {
@@ -378,38 +378,67 @@ export class SignalingHandler {
     }
 
     const router = this.roomservice.getRouter(roomId);
-    const videoProducer = this.roomservice.getProducer(videoProducerId);
-    const audioProducer = this.roomservice.getProducer(audioProducerId);
-
-    if (!router || !videoProducer || !audioProducer) {
-      return this.sendError("Required producers or router not found.");
+    if (!router) {
+      return this.sendError("Room not found or has no router.");
     }
 
-    // 2. Initialize and start the recorder
+    // 2. Get ALL producers in the room organized by user
+    const producersInfo = this.roomservice.getProducersByUser(roomId);
+
+    if (producersInfo.length === 0) {
+      return this.sendError("No participants with active media streams found.");
+    }
+
+    // Filter to only include participants with both video and audio
+    const validProducers = producersInfo.filter(p => p.video && p.audio);
+
+    if (validProducers.length === 0) {
+      return this.sendError("No participants with both video and audio found. Please ensure cameras and microphones are enabled.");
+    }
+
+    logger.recording.info("Starting composite recording", {
+      roomId,
+      totalParticipants: producersInfo.length,
+      validParticipants: validProducers.length,
+      participants: validProducers.map(p => ({ userId: p.userId, name: p.name }))
+    });
+
+    // 3. Initialize and start the composite recorder
     const recorder = new Recorder(roomId);
     try {
-      const peers = this.roomservice.getUsersInRoom(roomId);
-      const participants = peers.map(peerId => {
-        // Need to find peer info. I'll add a helper to RoomService or use existing data if possible.
-        // For now I'll assume I can get it from RoomService (I'll need to add a getter).
-        return (this.roomservice as any).getPeerInfo(roomId, peerId);
-      }).filter(p => p !== undefined);
+      // Get participant details for database
+      const participants = validProducers.map(p => ({
+        name: p.name,
+        email: p.email
+      }));
 
-      await recorder.start(router, videoProducer, audioProducer, participants);
+      await recorder.start(router, validProducers, participants);
       this.recorders.set(roomId, recorder);
 
-      // 3. Notify all peers that recording has started
+      // 4. Notify all peers that recording has started
       this.broadcastToRoom(roomId, {
         event: 'recording-started',
-        data: { startedBy: userId }
+        data: {
+          startedBy: userId,
+          participantCount: validProducers.length
+        }
       });
 
-      logger.recording.info("Recording started", { roomId, startedBy: userId });
+      logger.recording.info("Composite recording started successfully", {
+        roomId,
+        participantCount: validProducers.length,
+        startedBy: userId
+      });
     } catch (error) {
-      logger.recording.error("Failed to start recording", { roomId, error: String(error) });
-      this.sendError("Server failed to start the recording process.");
+      logger.recording.error("Failed to start composite recording", {
+        roomId,
+        error: String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      this.sendError(`Failed to start recording: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
 
   private handleStopRecording(data: any) {
     const { roomId } = data;
