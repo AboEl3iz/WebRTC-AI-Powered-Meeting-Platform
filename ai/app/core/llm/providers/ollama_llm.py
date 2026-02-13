@@ -6,7 +6,7 @@ from app.core.llm.base import BaseLLM
 class OllamaLLM(BaseLLM):
     def __init__(self, model: str = "gemma2:9b", base_url: str = None):
         self.model = model
-        self.base_url = base_url or os.getenv("OLLAMA_BASE_URL", "https://pixilated-heterogenetically-sherly.ngrok-free.dev/api")
+        self.base_url = base_url or os.getenv("OLLAMA_BASE_URL", "https://pixilated-heterogenetically-sherly.ngrok-free.dev")
 
     def generate(self, prompt: str, **kwargs) -> str:
         url = f"{self.base_url}/chat"

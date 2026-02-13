@@ -13,7 +13,7 @@ async function Bootstrap() {
     app.mediasoupworker();
     const config = new CustomConfig()
 
-    const mongoUri = process.env.MONGO_URI || "mongodb://admin:password@localhost:27017/webrtc?authSource=admin";
+    const mongoUri = process.env.MONGO_URI || "mongodb://root:example@localhost:27017/admin?authSource=admin";
 
     try {
         await mongoose.connect(mongoUri);
