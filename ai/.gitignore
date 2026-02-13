@@ -28,12 +28,12 @@ test_*
 *~
 .*.sw?
 .cache
-
+test_mcp_flow*
 # macOS
 .DS_Store
 .env
 .codspeed
-
+planner*
 input
 output
 .guide.md

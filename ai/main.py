@@ -8,12 +8,14 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from api.routes import process
 
+from mcp.router import router as mcp_router
 # Load env
 load_dotenv()
 
 app = FastAPI(title="AI Meeting Summarizer")
 
 app.include_router(process.router, prefix="/api/v1")
+app.include_router(mcp_router, prefix="/api/v1/mcp")
 
 @app.get("/")
 def read_root():
