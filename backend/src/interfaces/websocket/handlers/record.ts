@@ -3,12 +3,15 @@ import fs from 'fs-extra';
 import path from 'path';
 import net from 'net';
 import Meeting from '../../../models/Meeting';
+import { IParticipant } from '../../../models/Meeting';
 import logger from '../../../config/logger';
 import {
     calculateGrid,
     generateCompleteSDP,
     generateFFmpegArgs
 } from './recordUtils';
+import { rabbitMQService } from '../../../services/RabbitMQService';
+import { minioService } from '../../../services/MinioService';
 
 import type * as mediasoup from 'mediasoup';
 type Producer = mediasoup.types.Producer;
@@ -56,13 +59,16 @@ export class Recorder {
     private meetingId: string | null = null;
     private outputPath: string | null = null;
 
+    private participants: IParticipant[] = [];
+
     constructor(private roomId: string) { }
 
     async start(
         router: Router,
         producersInfo: ProducerInfo[],
-        participants: { name: string, email: string }[]
+        participants: IParticipant[]
     ) {
+        this.participants = participants;
         const recordingsDir = path.join(process.cwd(), 'recordings');
         await fs.ensureDir(recordingsDir);
 
@@ -243,10 +249,10 @@ export class Recorder {
 
             this.ffmpegProcess.stderr?.on('data', (data) => {
                 const output = data.toString();
-                logger.recording.debug("FFmpeg stderr", {
-                    roomId: this.roomId,
-                    output: output.substring(0, 500)
-                });
+                // logger.recording.debug("FFmpeg stderr", {
+                //     roomId: this.roomId,
+                //     output: output.substring(0, 500)
+                // });
 
                 // Check for errors in FFmpeg output
                 if (output.toLowerCase().includes('error')) {
@@ -333,6 +339,57 @@ export class Recorder {
                         { id: this.meetingId },
                         { status: 'completed', videoPath: this.outputPath }
                     );
+                }
+            }
+
+            // Upload to MinIO and publish RabbitMQ event
+            if (this.outputPath && this.meetingId) {
+                try {
+                    // Upload recording to MinIO
+                    const { key, url, bucket } = await minioService.uploadRecording(
+                        this.outputPath,
+                        this.roomId
+                    );
+
+                    logger.recording.info("Recording uploaded to MinIO", {
+                        roomId: this.roomId,
+                        key,
+                        url,
+                    });
+
+                    // Filter to only AI-enabled participants
+                    const aiParticipants = this.participants.filter(p => p.aiEnabled);
+
+                    if (aiParticipants.length > 0) {
+                        await rabbitMQService.publishRecordingComplete({
+                            meetingId: this.meetingId,
+                            roomId: this.roomId,
+                            videoUrl: url,
+                            videoBucket: bucket,
+                            videoKey: key,
+                            participants: aiParticipants.map(p => ({
+                                user_email: p.email,
+                                integrations: {
+                                    notion: p.integrations?.notion,
+                                    google_calendar: p.integrations?.google_calendar,
+                                },
+                            })),
+                        });
+
+                        logger.recording.info("Published recording.completed event", {
+                            roomId: this.roomId,
+                            aiParticipantCount: aiParticipants.length,
+                        });
+                    } else {
+                        logger.recording.info("No AI-enabled participants — skipping RabbitMQ publish", {
+                            roomId: this.roomId,
+                        });
+                    }
+                } catch (uploadError) {
+                    logger.recording.error("Failed to upload/publish recording", {
+                        roomId: this.roomId,
+                        error: String(uploadError),
+                    });
                 }
             }
 
