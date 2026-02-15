@@ -1,24 +1,30 @@
 import React, { useState } from 'react';
 import { Video } from 'lucide-react';
+import AIActivationPanel from './AIActivationPanel';
+import { AISettings } from '../types/integrations';
 
 interface JoinRoomProps {
-    onJoin: (roomId: string, name: string, email: string) => void;
+    onJoin: (roomId: string, name: string, email: string, aiSettings: AISettings) => void;
 }
 
 const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin }) => {
     const [name, setName] = useState('User');
     const [email, setEmail] = useState('');
     const [roomId, setRoomId] = useState('test-room');
+    const [aiSettings, setAISettings] = useState<AISettings>({
+        aiEnabled: false,
+        integrations: undefined,
+    });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (name.trim() && roomId.trim() && email.trim()) {
-            onJoin(roomId, name, email);
+            onJoin(roomId, name, email, aiSettings);
         }
     };
 
     return (
-        <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 overflow-y-auto">
             <div className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
                 <div className="text-center">
                     <div className="inline-flex items-center justify-center p-3 bg-blue-50 rounded-2xl mb-4">
@@ -65,6 +71,12 @@ const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin }) => {
                         />
                     </div>
 
+                    {/* AI Features Activation */}
+                    <AIActivationPanel
+                        aiSettings={aiSettings}
+                        onSettingsChange={setAISettings}
+                    />
+
                     <button
                         type="submit"
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
@@ -74,7 +86,10 @@ const JoinRoom: React.FC<JoinRoomProps> = ({ onJoin }) => {
                 </form>
 
                 <p className="text-center text-sm text-gray-400">
-                    Joining as a guest. All data is ephemeral.
+                    {aiSettings.aiEnabled
+                        ? '✨ AI features enabled — your meeting will be summarized automatically'
+                        : 'Joining as a guest. All data is ephemeral.'
+                    }
                 </p>
             </div>
         </div>

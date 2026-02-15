@@ -8,6 +8,7 @@ import JoinRoom from './components/JoinRoom'
 import DebugLogs from './components/DebugLogs'
 import ChatPanel from './components/ChatPanel'
 import ParticipantsPanel from './components/ParticipantsPanel'
+import { AISettings } from './types/integrations'
 
 function App() {
     const {
@@ -33,9 +34,9 @@ function App() {
     const [showParticipants, setShowParticipants] = useState(false)
     const [roomCode, setRoomCode] = useState('')
 
-    const handleJoin = async (roomId: string, name: string, email: string) => {
+    const handleJoin = async (roomId: string, name: string, email: string, aiSettings: AISettings) => {
         setRoomCode(roomId)
-        await join(roomId, name, email)
+        await join(roomId, name, email, aiSettings)
         setIsJoined(true)
     }
 
