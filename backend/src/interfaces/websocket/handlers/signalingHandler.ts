@@ -104,8 +104,16 @@ export class SignalingHandler {
 
   /* ================= ROOM ================= */
 
-  private async handleJoinRoom({ roomId, userId, name, email }: any) {
-    this.roomservice.addUserToRoom(roomId, userId, name || "Guest", email || "guest@example.com", this.ws);
+  private async handleJoinRoom({ roomId, userId, name, email, aiEnabled, integrations }: any) {
+    this.roomservice.addUserToRoom(
+      roomId,
+      userId,
+      name || "Guest",
+      email || "guest@example.com",
+      this.ws,
+      aiEnabled || false,
+      integrations || undefined
+    );
     this.currentRoomId = roomId;
     this.currentUserId = userId;
     let mediaRoom = this.roomservice.getMediaRoom(roomId);
@@ -406,11 +414,16 @@ export class SignalingHandler {
     // 3. Initialize and start the composite recorder
     const recorder = new Recorder(roomId);
     try {
-      // Get participant details for database
-      const participants = validProducers.map(p => ({
-        name: p.name,
-        email: p.email
-      }));
+      // Get participant details for database (including AI integrations)
+      const participants = validProducers.map(p => {
+        const peerInfo = this.roomservice.getPeerInfo(roomId, p.userId);
+        return {
+          name: p.name,
+          email: p.email,
+          aiEnabled: peerInfo?.aiEnabled || false,
+          integrations: peerInfo?.integrations,
+        };
+      });
 
       await recorder.start(router, validProducers, participants);
       this.recorders.set(roomId, recorder);

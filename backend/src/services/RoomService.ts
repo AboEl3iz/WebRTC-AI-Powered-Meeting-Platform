@@ -2,6 +2,7 @@ import * as mediasoup from "mediasoup";
 import WebSocket from "ws";
 import { MediaRoomWrapper } from "../media/MediaRoomWrapper";
 import { TransportWrapper } from "../media/TransportWrapper";
+import { IIntegrations } from "../models/Meeting";
 type WebRtcTransport = mediasoup.types.WebRtcTransport;
 type Producer = mediasoup.types.Producer;
 type Consumer = mediasoup.types.Consumer;
@@ -10,6 +11,8 @@ interface Peer {
     socket: WebSocket;
     name: string;
     email: string;
+    aiEnabled: boolean;
+    integrations?: IIntegrations;
     transports: Map<"send" | "recv", TransportWrapper>;
     producers: Map<string, Producer>;
     consumers: Map<string, Consumer>;
@@ -21,7 +24,15 @@ export class RoomService {
 
     /* ================= USERS ================= */
 
-    public addUserToRoom(roomId: string, userId: string, name: string, email: string, socket: WebSocket) {
+    public addUserToRoom(
+        roomId: string,
+        userId: string,
+        name: string,
+        email: string,
+        socket: WebSocket,
+        aiEnabled: boolean = false,
+        integrations?: IIntegrations
+    ) {
         if (!this.rooms.has(roomId)) {
             this.rooms.set(roomId, new Map());
         }
@@ -30,6 +41,8 @@ export class RoomService {
             socket,
             name,
             email,
+            aiEnabled,
+            integrations,
             transports: new Map(),
             producers: new Map(),
             consumers: new Map()
@@ -74,7 +87,12 @@ export class RoomService {
     public getPeerInfo(roomId: string, userId: string) {
         const peer = this.rooms.get(roomId)?.get(userId);
         if (!peer) return undefined;
-        return { name: peer.name, email: peer.email };
+        return {
+            name: peer.name,
+            email: peer.email,
+            aiEnabled: peer.aiEnabled,
+            integrations: peer.integrations
+        };
     }
 
     /**

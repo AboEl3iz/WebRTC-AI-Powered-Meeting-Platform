@@ -3,6 +3,7 @@ import * as mediasoupClient from 'mediasoup-client';
 import { Device, Transport, Producer, Consumer } from 'mediasoup-client/lib/types';
 import { Participant } from '../types/mediasoup';
 import { ChatMessage } from '../types/chat';
+import { AISettings } from '../types/integrations';
 
 export const useMediasoup = () => {
     const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
@@ -25,7 +26,9 @@ export const useMediasoup = () => {
         userId: '',
         userName: '',
         userEmail: '',
-        isReady: false
+        isReady: false,
+        aiEnabled: false as boolean,
+        integrations: undefined as AISettings['integrations'],
     });
 
     const addLog = useCallback((msg: string, type: string = 'info') => {
@@ -283,11 +286,13 @@ export const useMediasoup = () => {
         }
     }, [addLog, consumeMedia, updateParticipant, removeParticipant, participants]);
 
-    const join = useCallback(async (roomId: string, name: string, email: string) => {
+    const join = useCallback(async (roomId: string, name: string, email: string, aiSettings?: AISettings) => {
         stateRef.current.roomId = roomId;
         stateRef.current.userName = name;
         stateRef.current.userEmail = email;
         stateRef.current.userId = `${name}-${Date.now()}`;
+        stateRef.current.aiEnabled = aiSettings?.aiEnabled || false;
+        stateRef.current.integrations = aiSettings?.integrations;
 
         // Get local stream first
         try {
@@ -313,8 +318,10 @@ export const useMediasoup = () => {
                     data: {
                         roomId: stateRef.current.roomId,
                         userId: stateRef.current.userId,
-                        userName: stateRef.current.userName,
-                        userEmail: stateRef.current.userEmail
+                        name: stateRef.current.userName,
+                        email: stateRef.current.userEmail,
+                        aiEnabled: stateRef.current.aiEnabled,
+                        integrations: stateRef.current.integrations,
                     }
                 }));
 
