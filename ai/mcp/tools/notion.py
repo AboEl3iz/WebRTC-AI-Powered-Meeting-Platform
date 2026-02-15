@@ -39,8 +39,8 @@ class NotionTool:
             }
             
         except APIResponseError as e:
-            logger.error(f"[Notion] API error creating page: {e.code} - {e.message}")
-            raise Exception(f"Notion API error: {e.message}")
+            logger.error(f"[Notion] API error creating page: {e.code} - {str(e)}")
+            raise Exception(f"Notion API error: {str(e)}")
         except Exception as e:
             logger.error(f"[Notion] Error creating page: {e}")
             raise

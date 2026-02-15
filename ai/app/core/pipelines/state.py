@@ -9,3 +9,7 @@ class PipelineState(TypedDict):
     summary: Optional[str]
     events: Optional[List[dict]]
     error: Optional[str]
+    # AI feature opt-in fields
+    meeting_id: Optional[str]
+    participants: Optional[List[dict]]           # AI-enabled participants with integrations
+    distribution_results: Optional[List[dict]]   # Results from distribute node
