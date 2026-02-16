@@ -1,4 +1,4 @@
-<![CDATA[# 🚀 WebRTC AI-Powered Meeting Platform
+# 🚀 WebRTC AI-Powered Meeting Platform
 
 > A full-stack, real-time video conferencing platform with **AI-powered meeting intelligence** — featuring live video/audio, chat, composite recording, automatic transcription, summarization, event extraction, and distribution to **Notion** and **Google Calendar**.
 
@@ -213,4 +213,4 @@ Explore the README for each component:
 ## 📄 License
 
 This project is licensed under the **MIT License**.
-]]>
+

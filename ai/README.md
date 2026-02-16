@@ -1,4 +1,4 @@
-<![CDATA[# 🧠 AI Service — Meeting Intelligence Pipeline
+# 🧠 AI Service — Meeting Intelligence Pipeline
 
 > An intelligent meeting processing service built with **Python**, **FastAPI**, **LangGraph**, **Whisper**, and **LLMs**, featuring automated transcription, summarization, event extraction, and distribution to **Notion** and **Google Calendar** via an MCP (Model Context Protocol) layer.
 
@@ -234,4 +234,4 @@ WHISPER_MODEL=medium
 - [🖥️ Frontend (Video Conferencing UI)](../frontend/README.md)
 - [📡 Backend (Signaling & Media Server)](../backend/README.md)
 - [📘 Full Project Overview](../README.md)
-]]>
+

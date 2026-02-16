@@ -1,4 +1,4 @@
-<![CDATA[# 📡 Backend — WebRTC Signaling & Media Server
+# 📡 Backend — WebRTC Signaling & Media Server
 
 > A high-performance real-time signaling and media server built with **Node.js**, **TypeScript**, **mediasoup** (SFU), **WebSocket**, and **Express**, backed by **MongoDB**, **MinIO**, and **RabbitMQ**.
 
@@ -169,4 +169,4 @@ MINIO_BUCKET=recordings
 - [🖥️ Frontend (Video Conferencing UI)](../frontend/README.md)
 - [🧠 AI Service (Meeting Intelligence)](../ai/README.md)
 - [📘 Full Project Overview](../README.md)
-]]>
+

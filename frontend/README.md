@@ -1,4 +1,4 @@
-<![CDATA[# 🎥 Frontend — Real-Time Video Conferencing UI
+# 🎥 Frontend — Real-Time Video Conferencing UI
 
 > A modern, responsive video conferencing interface built with **React**, **TypeScript**, and **Vite**, powered by **mediasoup-client** for WebRTC media handling.
 
@@ -143,4 +143,4 @@ docker run -p 5173:5173 webrtc-frontend
 - [📡 Backend (Signaling & Media Server)](../backend/README.md)
 - [🧠 AI Service (Meeting Intelligence)](../ai/README.md)
 - [📘 Full Project Overview](../README.md)
-]]>
+
