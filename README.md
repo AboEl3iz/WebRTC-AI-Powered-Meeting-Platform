@@ -12,37 +12,17 @@ This project is an end-to-end video conferencing application that combines the p
 
 ## 🏛️ Architecture
 
-```
-┌──────────────────────────────────┐
-│        Frontend (React)          │
-│   WebRTC Client + Meeting UI     │
-│   Video · Audio · Chat · AI UI   │
-└───────────┬──────────────────────┘
-            │ WebSocket (Signaling)
-            │ mediasoup-client (Media)
-            ▼
-┌──────────────────────────────────┐
-│      Backend (Node.js)           │
-│   Signaling Server + SFU        │
-│   Chat · Recording · MinIO      │
-└──────┬────────────┬──────────────┘
-       │            │
-       │ Upload     │ Publish Event
-       ▼            ▼
-┌──────────┐  ┌──────────────┐
-│  MinIO   │  │  RabbitMQ    │
-│ (S3 Obj) │  │ (Event Bus)  │
-└──────────┘  └──────┬───────┘
-                     │ recording.completed
-                     ▼
-┌──────────────────────────────────┐
-│       AI Service (Python)        │
-│   LangGraph Pipeline:            │
-│   Audio → Transcribe → Refine   │
-│   → Summarize → Extract Events  │
-│   → Distribute (Notion/Calendar) │
-└──────────────────────────────────┘
-```
+### System Design
+
+![System Design](./system_design.png)
+
+### Backend Flow
+
+![Backend Flow](./backend_flow.png)
+
+### AI Pipelines
+
+![AI Pipelines](./AI_piplines.png)
 
 ---
 
